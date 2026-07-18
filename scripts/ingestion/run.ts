@@ -16,7 +16,7 @@ import { z } from "zod";
 import { normaliseLaTeX, stripLaTeX } from "../../functions/src/shared/latex";
 import { resolveCompetition } from "../../functions/src/shared/competition";
 import { computeDedupHash } from "../../functions/src/shared/dedup";
-import type { CanonicalProblem, SolutionDraft } from "../../functions/src/domain/ingestion/types";
+import type { CanonicalProblem, CanonicalSolution, CompetitionLevel } from "../../functions/src/domain/ingestion/types";
 import { OpenAIClassifier, applyClassification } from "../../functions/src/infrastructure/ai/classifier";
 import { OpenAIEmbedder } from "../../functions/src/infrastructure/ai/embedder";
 import { PostgresProblemRepository } from "../../functions/src/infrastructure/database/problem-repository";
@@ -82,14 +82,19 @@ const NuminaMathSchema = z.object({
 
 // ── Parser helpers ────────────────────────────────────────────────────────────
 
-const OLYM_LEVEL: Record<string, string> = { "1": "state", "2": "national", "3": "international" };
+// Maps OlymMATH numeric level → competition level
+const OLYM_LEVEL_MAP: Record<string, CompetitionLevel> = {
+  "1": "state",
+  "2": "national",
+  "3": "international",
+};
 
 function makeTitle(s: string): string {
   return s.slice(0, 80).replace(/\n/g, " ");
 }
 
-function solution(raw: string | null | undefined): SolutionDraft[] {
-  return raw ? [{ approachName: "Source solution", body: raw, isCanonical: true }] : [];
+function solution(raw: string | null | undefined): CanonicalSolution[] {
+  return raw ? [{ approachName: "Solution 1", body: raw, isCanonical: true }] : [];
 }
 
 // ── Source-specific parsers → CanonicalProblem ────────────────────────────────
@@ -103,12 +108,13 @@ function parseOmniMath(raw: unknown): CanonicalProblem {
     externalId: `omni-math::${h}`, sourceDataset: "omni-math", dedupHash: h,
     title: makeTitle(st), statement: st, statementPlain: stripLaTeX(r.problem),
     answer: r.answer ?? null, solutions: solution(r.solution), language: "en",
-    sourceCompetition: c?.abbreviation ?? null, sourceLevel: c?.level ?? null,
+    sourceCompetition: c?.abbreviation ?? null,
+    sourceDomainPath: r.domain ? r.domain.join(" -> ") : null,
     sourceSubject: r.domain?.join(" ").toLowerCase() || null,
-    sourceDifficulty: r.difficulty != null ? String(r.difficulty) : null,
+    sourceDifficulty: r.difficulty ?? null,
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
-    competitionLevel: null, positionInPaper: null, techniqueDepth: null,
+    competitionLevel: c?.level ?? null, positionInPaper: null, techniqueDepth: null,
     creativityDemand: null, proofStyle: null, entryBarrier: null,
     estimatedSolveTimeMinutes: null,
   };
@@ -126,11 +132,12 @@ function parseOlympiadBench(raw: unknown): CanonicalProblem | null {
     externalId: `olympiad-bench::${h}`, sourceDataset: "olympiad-bench", dedupHash: h,
     title: makeTitle(st), statement: st, statementPlain: stripLaTeX(r.problem),
     answer: ans, solutions: solution(r.solution), language: "en",
-    sourceCompetition: c?.abbreviation ?? null, sourceLevel: c?.level ?? null,
-    sourceSubject: r.subject ?? null, sourceDifficulty: r.difficulty ?? null,
+    sourceCompetition: c?.abbreviation ?? null,
+    sourceDomainPath: null,
+    sourceSubject: r.subject ?? null, sourceDifficulty: null,  // difficulty is text rating, not numeric
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
-    competitionLevel: null, positionInPaper: null, techniqueDepth: null,
+    competitionLevel: c?.level ?? null, positionInPaper: null, techniqueDepth: null,
     creativityDemand: null, proofStyle: null, entryBarrier: null,
     estimatedSolveTimeMinutes: null,
   };
@@ -140,15 +147,16 @@ function parseOlymMATH(raw: unknown): CanonicalProblem {
   const r  = OlymMATHSchema.parse(raw);
   const st = normaliseLaTeX(r.problem);
   const h  = computeDedupHash(r.problem);
+  const level: CompetitionLevel | null = r.level != null ? (OLYM_LEVEL_MAP[r.level] ?? null) : null;
   return {
     externalId: `olympmath::${h}`, sourceDataset: "olympmath", dedupHash: h,
     title: makeTitle(st), statement: st, statementPlain: stripLaTeX(r.problem),
     answer: r.answer ?? null, solutions: solution(r.solution), language: "zh",
-    sourceCompetition: null, sourceLevel: r.level != null ? (OLYM_LEVEL[r.level] ?? null) : null,
-    sourceSubject: null, sourceDifficulty: r.level ?? null,
+    sourceCompetition: null, sourceDomainPath: null,
+    sourceSubject: null, sourceDifficulty: null,
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
-    competitionLevel: null, positionInPaper: null, techniqueDepth: null,
+    competitionLevel: level, positionInPaper: null, techniqueDepth: null,
     creativityDemand: null, proofStyle: null, entryBarrier: null,
     estimatedSolveTimeMinutes: null,
   };
@@ -166,11 +174,11 @@ function parseNuminaMath(raw: unknown): CanonicalProblem | null {
     answer: r.answer ?? null,
     solutions: solution(r.solution ? r.solution.slice(0, 10_000) : null),
     language: "en",
-    sourceCompetition: c?.abbreviation ?? null, sourceLevel: c?.level ?? null,
+    sourceCompetition: c?.abbreviation ?? null, sourceDomainPath: null,
     sourceSubject: null, sourceDifficulty: null,
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
-    competitionLevel: null, positionInPaper: null, techniqueDepth: null,
+    competitionLevel: c?.level ?? null, positionInPaper: null, techniqueDepth: null,
     creativityDemand: null, proofStyle: null, entryBarrier: null,
     estimatedSolveTimeMinutes: null,
   };
