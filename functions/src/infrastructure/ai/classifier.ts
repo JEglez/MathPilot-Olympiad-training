@@ -31,7 +31,7 @@ const ClassificationOutputSchema = z.object({
   estimated_solve_time_minutes: z.number().int().min(5).max(240).nullable().optional(),
 });
 
-type ClassificationOutput = z.infer<typeof ClassificationOutputSchema>;
+export type ClassificationOutput = z.infer<typeof ClassificationOutputSchema>;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
