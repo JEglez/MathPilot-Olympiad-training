@@ -199,4 +199,116 @@ export class PostgresProblemRepository {
       [status, runId],
     );
   }
+
+  /** Fetch problems that have no classification yet (proof_style IS NULL) */
+  async fetchUnclassified(limit = 10_000): Promise<Array<{
+    id: string;
+    externalId: string;
+    statementPlain: string;
+    sourceSubject: string | null;
+    sourceDifficulty: number | null;
+    sourceCompetition: string | null;
+  }>> {
+    const result = await this.pool.query<{
+      id: string;
+      external_id: string;
+      statement_plain: string;
+      source_subject: string | null;
+      source_difficulty: number | null;
+      source_competition: string | null;
+    }>(
+      `SELECT p.id, ir.external_id, p.statement_plain,
+              ir.source_subject, ir.source_difficulty,
+              c.abbreviation AS source_competition
+       FROM problems p
+       JOIN import_records ir ON ir.problem_id = p.id
+       LEFT JOIN competitions c ON c.id = p.source_competition_id
+       WHERE p.proof_style IS NULL
+       LIMIT $1`,
+      [limit],
+    );
+    return result.rows.map(r => ({
+      id: r.id,
+      externalId: r.external_id,
+      statementPlain: r.statement_plain,
+      sourceSubject: r.source_subject,
+      sourceDifficulty: r.source_difficulty,
+      sourceCompetition: r.source_competition,
+    }));
+  }
+
+  /** Update classification columns on an existing problem row */
+  async updateClassification(
+    problemId: string,
+    classification: {
+      competitionLevel: string | null;
+      positionInPaper: string | null;
+      techniqueDepth: string | null;
+      creativityDemand: string | null;
+      proofStyle: string | null;
+      entryBarrier: string | null;
+      estimatedSolveTimeMinutes: number | null;
+      topics: string[];
+      subtopics: string[];
+      techniques: Array<{ code: string; isPrimary: boolean }>;
+    },
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      await client.query(
+        `UPDATE problems SET
+           competition_level = $1, position_in_paper = $2, technique_depth = $3,
+           creativity_demand = $4, proof_style = $5, entry_barrier = $6,
+           estimated_solve_time_minutes = $7, needs_review = false,
+           updated_at = now()
+         WHERE id = $8`,
+        [
+          classification.competitionLevel,
+          classification.positionInPaper,
+          classification.techniqueDepth,
+          classification.creativityDemand,
+          classification.proofStyle,
+          classification.entryBarrier,
+          classification.estimatedSolveTimeMinutes,
+          problemId,
+        ],
+      );
+
+      if (classification.topics.length > 0) {
+        await client.query(
+          `INSERT INTO problem_topics (problem_id, topic_id)
+           SELECT $1, id FROM topics WHERE code = ANY($2)
+           ON CONFLICT DO NOTHING`,
+          [problemId, classification.topics],
+        );
+      }
+
+      if (classification.subtopics.length > 0) {
+        await client.query(
+          `INSERT INTO problem_subtopics (problem_id, subtopic_id)
+           SELECT $1, id FROM subtopics WHERE code = ANY($2)
+           ON CONFLICT DO NOTHING`,
+          [problemId, classification.subtopics],
+        );
+      }
+
+      for (const t of classification.techniques) {
+        await client.query(
+          `INSERT INTO problem_techniques (problem_id, technique_id, is_primary)
+           SELECT $1, id, $2 FROM techniques WHERE code = $3
+           ON CONFLICT (problem_id, technique_id) DO NOTHING`,
+          [problemId, t.isPrimary, t.code],
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
 }

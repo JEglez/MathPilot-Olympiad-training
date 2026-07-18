@@ -24,6 +24,10 @@ on:
         description: 'Load taxonomy seed data (first run only)'
         type: boolean
         default: false
+      reclassify_only:
+        description: 'Re-classify only — update problems with NULL proof_style (no re-fetch, no re-embed)'
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -93,6 +97,7 @@ jobs:
           MATHPILOT_EMBEDDING_MODEL:      ${{ secrets.MATHPILOT_EMBEDDING_MODEL }}
           IMPORT_SOURCE:                  ${{ inputs.source }}
           DRY_RUN:                        ${{ inputs.dry_run }}
+          RECLASSIFY_ONLY:                ${{ inputs.reclassify_only }}
 
       # ── Optional: post-import search indexes (run after first full import) ──
 

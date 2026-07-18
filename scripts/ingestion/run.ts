@@ -24,9 +24,10 @@ import { fetchHuggingFaceDataset } from "../../functions/src/infrastructure/data
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const DRY_RUN = process.env["DRY_RUN"] === "true";
-const SOURCE  = process.env["IMPORT_SOURCE"] ?? "all";
-const CACHE   = process.env["MATHPILOT_DATASET_CACHE"] ?? ".cache";
+const DRY_RUN        = process.env["DRY_RUN"] === "true";
+const SOURCE         = process.env["IMPORT_SOURCE"] ?? "all";
+const CACHE          = process.env["MATHPILOT_DATASET_CACHE"] ?? ".cache";
+const RECLASSIFY_ONLY = process.env["RECLASSIFY_ONLY"] === "true";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -198,13 +199,70 @@ const PARSERS: Record<string, (raw: unknown) => CanonicalProblem | null> = {
 // ── Main orchestration ────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const sources = SOURCE === "all" ? [...SOURCE_ORDER] : [SOURCE];
-
   const endpoint = requireEnv("MATHPILOT_OPENAI_ENDPOINT");
   const apiKey   = requireEnv("MATHPILOT_OPENAI_API_KEY");
 
   const pool       = PostgresProblemRepository.create(requireEnv("MATHPILOT_DB_URL"));
   const classifier = new OpenAIClassifier({ modelId: requireEnv("MATHPILOT_CLASSIFICATION_MODEL"), endpoint, apiKey });
+
+  // ── Reclassify-only mode: update classification on problems with NULL proof_style ──
+  if (RECLASSIFY_ONLY) {
+    log("reclassify:start", {});
+    const unclassified = await pool.fetchUnclassified();
+    log("reclassify:found", { count: unclassified.length });
+
+    const BATCH = 20;
+    let updated = 0, failed = 0;
+    for (let i = 0; i < unclassified.length; i += BATCH) {
+      const group = unclassified.slice(i, i + BATCH);
+      const classResults = await classifier.classifyBatch(
+        group.map(r => ({
+          externalId: r.externalId,
+          statementPlain: r.statementPlain,
+          sourceSubject: r.sourceSubject,
+          sourceDifficulty: r.sourceDifficulty,
+          sourceCompetition: r.sourceCompetition,
+        } as CanonicalProblem)),
+      );
+      for (const row of group) {
+        const cr = classResults.get(row.externalId);
+        if (!cr?.ok) {
+          log("classify:warn", { id: row.externalId, error: cr?.error.kind ?? "missing" });
+          failed++;
+          continue;
+        }
+        try {
+          await pool.updateClassification(row.id, {
+            competitionLevel: cr.value.competition_level,
+            positionInPaper: cr.value.position_in_paper ?? null,
+            techniqueDepth: cr.value.technique_depth,
+            creativityDemand: cr.value.creativity_demand,
+            proofStyle: cr.value.proof_style,
+            entryBarrier: cr.value.entry_barrier,
+            estimatedSolveTimeMinutes: cr.value.estimated_solve_time_minutes ?? null,
+            topics: cr.value.topics,
+            subtopics: cr.value.subtopics,
+            techniques: cr.value.techniques.map(t => ({ code: t.code, isPrimary: t.is_primary })),
+          });
+          updated++;
+        } catch (e) {
+          log("update:error", { id: row.externalId, error: String(e) });
+          failed++;
+        }
+      }
+      if ((i + BATCH) % 100 === 0) {
+        log("reclassify:progress", { processed: Math.min(i + BATCH, unclassified.length), total: unclassified.length, updated, failed });
+      }
+    }
+
+    await pool.end();
+    log("reclassify:complete", { updated, failed });
+    if (failed > 0 && failed / unclassified.length > 0.1) process.exit(1);
+    return;
+  }
+
+  // ── Normal ingestion ──────────────────────────────────────────────────────────
+  const sources  = SOURCE === "all" ? [...SOURCE_ORDER] : [SOURCE];
   const embedder   = new OpenAIEmbedder({ modelId: requireEnv("MATHPILOT_EMBEDDING_MODEL"), endpoint, apiKey });
   const repository = pool;
 
