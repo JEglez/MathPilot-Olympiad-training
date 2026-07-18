@@ -870,7 +870,163 @@ Statement: ${p.statement}
 
 ---
 
-## 12. Open Questions
+## 12. Error Handling
+
+### 12.1 Per-Problem Errors
+
+The pipeline processes problems individually. A single problem failure must NOT
+block the rest of the import batch.
+
+| Error | Cause | Action |
+|-------|-------|--------|
+| **Parse failure** | Source record missing `problem` field or malformed JSON | Log error, skip problem, increment `skipped` counter |
+| **LaTeX normalisation failure** | Unparseable LaTeX (e.g., broken delimiters) | Store raw statement as-is, flag `needs_review: true` |
+| **Dedup collision** | SHA-256 hash already in `import_records` | Skip silently, log as `duplicate` |
+| **Classification failure** | GPT-4o-mini returns invalid JSON or codes not in taxonomy | Retry once with correction prompt; if still invalid, store problem with `status: draft` and empty classification (flag for manual review) |
+| **Classification timeout** | Batch API exceeds 24h or individual call hangs | Retry the batch; problems already stored are idempotent via dedup hash |
+| **Embedding failure** | OpenAI API error | Retry with exponential backoff (3 attempts); if still failing, store in PostgreSQL without AI Search entry (add to search index later) |
+| **PostgreSQL write failure** | Constraint violation, connection error | Rollback transaction, log full error, add to dead-letter queue for manual inspection |
+| **AI Search write failure** | Index unavailable or quota exceeded | Store in PostgreSQL (source of truth); queue for AI Search retry |
+
+### 12.2 Batch-Level Tracking
+
+Each import run produces a summary:
+
+```json
+{
+  "run_id": "import-2026-07-18-omni-math",
+  "source_dataset": "omni-math",
+  "started_at": "2026-07-18T10:00:00Z",
+  "completed_at": "2026-07-18T10:45:00Z",
+  "total_records": 4428,
+  "imported": 4102,
+  "duplicates_skipped": 280,
+  "classification_failures": 12,
+  "parse_errors": 3,
+  "flagged_for_review": 31,
+  "status": "completed_with_warnings"
+}
+```
+
+Stored in an `import_runs` table for auditability.
+
+### 12.3 Idempotency
+
+The pipeline is safe to re-run. The `dedup_hash` UNIQUE constraint on
+`import_records` prevents double-inserts. Re-running a source adapter on the
+same dataset version produces zero new rows (all skipped as duplicates).
+
+---
+
+## 13. Project Structure
+
+```
+mathpilot/
+├── apps/
+│   └── web/                          # React SPA (Vite)
+│       ├── src/
+│       │   ├── components/
+│       │   │   ├── ProblemCard.tsx
+│       │   │   ├── SearchBar.tsx
+│       │   │   ├── FilterPanel.tsx
+│       │   │   └── ChatPanel.tsx
+│       │   ├── pages/
+│       │   │   ├── SearchPage.tsx
+│       │   │   ├── BrowsePage.tsx
+│       │   │   └── ChatPage.tsx
+│       │   ├── services/
+│       │   │   └── api.ts            # API client
+│       │   └── App.tsx
+│       ├── package.json
+│       └── vite.config.ts
+│
+├── functions/                        # Azure Functions (single Function App)
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── search.ts             # GET /api/search
+│   │   │   ├── browse.ts             # GET /api/problems
+│   │   │   └── chat.ts               # POST /api/chat
+│   │   │
+│   │   ├── import/
+│   │   │   ├── adapters/
+│   │   │   │   ├── types.ts          # SourceAdapter interface, CanonicalProblem
+│   │   │   │   ├── omni-math.ts
+│   │   │   │   ├── olympiad-bench.ts
+│   │   │   │   ├── olympmath.ts
+│   │   │   │   └── numina-math.ts
+│   │   │   ├── normalise/
+│   │   │   │   ├── latex.ts          # LaTeX normalisation + plain text
+│   │   │   │   ├── dedup.ts          # SHA-256 dedup hash
+│   │   │   │   └── competition.ts    # Competition name resolution map
+│   │   │   ├── classify/
+│   │   │   │   ├── classifier.ts     # GPT-4o-mini classification caller
+│   │   │   │   ├── prompts.ts        # System + user prompt templates
+│   │   │   │   └── validate.ts       # Post-classification validation rules
+│   │   │   ├── store/
+│   │   │   │   ├── postgres.ts       # PostgreSQL write logic
+│   │   │   │   └── search-index.ts   # AI Search document push
+│   │   │   └── run-import.ts         # Orchestrator: fetch → normalise → classify → store
+│   │   │
+│   │   └── shared/
+│   │       ├── db.ts                 # PostgreSQL connection pool
+│   │       ├── openai.ts             # Azure OpenAI client
+│   │       └── search.ts             # AI Search client
+│   │
+│   ├── host.json
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── db/
+│   ├── migrations/
+│   │   ├── 001_create_taxonomy.sql   # topics, subtopics, techniques, learning_objectives
+│   │   ├── 002_create_problems.sql   # problems, solutions, problem_relationships, translations
+│   │   ├── 003_create_join_tables.sql# problem_topics, problem_subtopics, problem_techniques, etc.
+│   │   ├── 004_create_competitions.sql
+│   │   └── 005_create_import_tables.sql  # import_records, import_runs
+│   └── seed/
+│       ├── topics.sql                # 8 domains from taxonomy.md
+│       ├── subtopics.sql             # 58 subtopics from taxonomy.md
+│       ├── techniques.sql            # 160+ techniques from taxonomy.md
+│       └── competitions.sql          # Known competitions (IMO, USAMO, OMM, etc.)
+│
+├── infra/
+│   ├── main.bicep                    # All Azure resources
+│   ├── modules/
+│   │   ├── functions.bicep
+│   │   ├── postgres.bicep
+│   │   ├── search.bicep
+│   │   ├── openai.bicep
+│   │   └── storage.bicep
+│   └── parameters.json
+│
+├── docs/                             # ← existing documentation (this repo)
+│   ├── domain-model.md
+│   ├── taxonomy.md
+│   ├── taxonomy-integration.md
+│   └── plan/
+│       ├── 01-product-analysis.md
+│       ├── 02-mvp-architecture.md
+│       └── 03-dataset-import-search.md
+│
+├── .github/
+│   └── workflows/
+│       ├── deploy-web.yml            # CI/CD: build + deploy React SPA
+│       └── deploy-functions.yml      # CI/CD: build + deploy Azure Functions
+│
+├── package.json                      # Workspace root (monorepo)
+└── README.md
+```
+
+**Key conventions:**
+- **Monorepo** with `apps/` (frontend) and `functions/` (backend) workspaces
+- Import adapters are pluggable: add a new file in `adapters/` for each source
+- Database migrations are numbered and sequential
+- Seed data is generated directly from `taxonomy.md` codes and names
+- Infrastructure as Code via Bicep (matching `02-mvp-architecture.md` §10)
+
+---
+
+## 14. Open Questions
 
 | # | Question | Decision Needed By |
 |---|----------|--------------------|
