@@ -76,10 +76,14 @@ broad, universally recognised branches.
 **Examples:**
 | code | name |
 |------|------|
-| `NT` | Number Theory |
-| `ALG` | Algebra |
-| `GEO` | Geometry |
-| `COMB` | Combinatorics |
+| `ALG` | Algebraic Structures & Manipulations |
+| `NT` | Number Theory & Arithmetic |
+| `GEO-S` | Synthetic & Projective Geometry |
+| `GEO-A` | Analytic & Transformational Geometry |
+| `COMB-E` | Enumerative & Algebraic Combinatorics |
+| `COMB-S` | Structural & Extremal Combinatorics |
+| `GAME` | Strategies, Algorithms & Games |
+| `MISC` | Cross-Domain & Unconventional |
 
 ---
 
@@ -215,10 +219,16 @@ multiple axes rather than a single difficulty number.
 | `source_year` | int | Year of competition |
 | `source_round` | string | "P3", "Shortlist C5", etc. |
 | `solution_sketch` | text | Reference solution outline |
-| `detailed_solutions` | json[] | Multiple solution approaches |
 | `estimated_solve_time_minutes` | int | Typical time for a prepared student |
 | `elegance_rating` | float | Community/editorial rating of beauty |
+| `status` | enum | `draft`, `in_review`, `published`, `archived` |
+| `ingestion_source` | enum | `pdf_upload`, `manual_entry`, `api_import`, `community` |
+| `source_document_url` | string | Original PDF or URL the problem was extracted from |
+| `language` | string | Original language (e.g. `es`, `en`, `zh`) |
+| `statement_embedding` | vector | Semantic embedding for AI Search (generated, not user-set) |
 | `created_at` | timestamp | When added to the platform |
+| `reviewed_at` | timestamp | When a human verified classification |
+| `reviewed_by` | FK → User | Who reviewed it |
 
 **Multi-dimensional classification (via join tables):**
 
@@ -257,9 +267,28 @@ personalised_difficulty(problem, student) =
 
 **Relationships:**
 - Belongs to → **Competition** (source)
+- Has many → **Solution** (multiple solution approaches)
 - Has many ↔ **Topic**, **Subtopic**, **Technique**, **LearningObjective**
+- Has many ↔ **Problem** (via **ProblemRelationship** — similar, easier/harder variants)
 - Appears in many → **PersonalTrainingCollection**
 - Attempted in many → **TrainingSession**
+
+**Problem lifecycle:**
+
+```
+  pdf_upload / manual_entry / api_import
+              │
+              ▼
+          ┌────────┐     AI classifies      ┌───────────┐     human verifies     ┌───────────┐
+          │  draft  │ ──────────────────────▶│ in_review │ ──────────────────────▶│ published │
+          └────────┘                         └───────────┘                        └───────────┘
+                                                                                       │
+                                                                                 soft-delete
+                                                                                       ▼
+                                                                                 ┌──────────┐
+                                                                                 │ archived │
+                                                                                 └──────────┘
+```
 
 **Example:**
 
@@ -267,6 +296,7 @@ personalised_difficulty(problem, student) =
 Problem:
   title: "Coloured Points on a Circle"
   source: IMO 2023 Shortlist, C4
+  status: published
   competition_level: international
   position_in_paper: middle
   proof_style: existence
@@ -277,6 +307,100 @@ Problem:
   techniques: [Pigeonhole Principle (primary), Double Counting]
   learning_objectives: [LO-PHP-04, LO-DC-02]
 ```
+
+---
+
+### 5b. Solution
+
+**Purpose:** A distinct solution approach to a Problem. Extracted from
+`detailed_solutions` (which was a json[] blob) into a first-class entity so that
+solutions can be individually searched, rated, linked to specific techniques, and
+used by the AI to generate targeted hints.
+
+**Why this is needed:** A problem often has 2–4 valid solution approaches, each
+using different techniques. When the AI recommends a problem to reinforce `T-INV`
+(inversion), it needs to know *which solution* uses inversion — not just that
+the problem "requires" it. It also enables the AI to say "you solved it with
+Cauchy-Schwarz — now try the generating functions approach."
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `problem_id` | FK → Problem | Parent problem |
+| `approach_name` | string | e.g. "Via inversion", "Generating functions approach" |
+| `body` | text | Full solution text (LaTeX) |
+| `techniques_used` | FK[] → Technique | Which techniques this specific approach uses |
+| `elegance_rating` | float | How elegant this particular approach is |
+| `is_canonical` | bool | Is this the "standard" or most instructive solution? |
+| `author` | string | Who wrote this solution (attribution) |
+| `created_at` | timestamp | |
+
+**Relationships:**
+- Belongs to → **Problem**
+- Has many ↔ **Technique** (techniques used in *this* approach)
+
+**Impact on existing model:**
+- Removes `detailed_solutions` json[] from Problem (replaced by this entity)
+- Enables technique-specific search: "find problems with a solution using inversion"
+- The `problem_techniques` join table now represents the *union* of techniques
+  across all solutions; each Solution carries its own technique list
+
+**Example:**
+```
+Problem: ISL-2019-C3
+  Solution 1:
+    approach_name: "Direct PHP on residues"
+    techniques_used: [T-PHP, T-CONGBASIC]
+    is_canonical: true
+  Solution 2:
+    approach_name: "Generating functions"
+    techniques_used: [T-OGF, T-BINOMEXP]
+    is_canonical: false
+```
+
+---
+
+### 5c. Problem Relationship
+
+**Purpose:** Expresses connections between problems — similarity, prerequisite
+ordering, alternative formulations, or difficulty variants. This is the backbone
+of "if you liked this problem, try this one" recommendations and "try the easier
+version first" scaffolding.
+
+**Why this is needed:** The current model has no way to say "Problem A is a simpler
+version of Problem B" or "these two problems are essentially the same idea in
+different clothing." Without this, recommendations are purely technique-based and
+miss the pedagogical structure that experienced coaches use.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `problem_a_id` | FK → Problem | First problem |
+| `problem_b_id` | FK → Problem | Second problem |
+| `relationship_type` | enum | `similar`, `easier_variant`, `harder_variant`, `prerequisite`, `dual`, `generalisation` |
+| `strength` | float | How strong the relationship is (0–1) |
+| `explanation` | text | Why these problems are related |
+| `detected_by` | enum | `ai_embedding`, `ai_classification`, `human_coach`, `community` |
+| `created_at` | timestamp | |
+
+**Relationship types:**
+| Type | Meaning | Directionality |
+|------|---------|----------------|
+| `similar` | Same techniques, similar structure | Symmetric |
+| `easier_variant` | A is an easier version of B | A → B (directed) |
+| `harder_variant` | A is a harder version of B | A → B (directed) |
+| `prerequisite` | Solve A before attempting B | A → B (directed) |
+| `dual` | Same problem restated (different competition, same idea) | Symmetric |
+| `generalisation` | B generalises A | A → B (directed) |
+
+**Relationships:**
+- Links two → **Problem** entities
+- Used by recommendation engine and training plan generator
+
+**Impact on existing model:**
+- Enriches recommendations beyond technique matching
+- Enables "problem ladders" — sequences of increasing difficulty on the same idea
+- AI can auto-detect similarity via `statement_embedding` cosine similarity
 
 ---
 
@@ -351,7 +475,61 @@ objectives and aggregated topic-level proficiency.
 - Has many → **KnowledgeGap**
 - Has many → **PersonalTrainingCollection**
 - Has many → **TrainingSession**
+- Has many → **TrainingPlan**
 - Has many ↔ **LearningObjective** (via `student_mastery`)
+- Has many → **MasterySnapshot** (historical progression)
+
+---
+
+### 7b. Mastery Snapshot (History)
+
+**Purpose:** Records a point-in-time snapshot of a student's mastery state.
+The `student_mastery` table only stores the *current* state — this entity captures
+how mastery evolved over time, enabling progress visualisation, regression
+detection, and "you've improved X% this month" reporting.
+
+**Why this is needed:** Without history, the system can't answer "how much did
+Maria improve this week?" or "is she regressing on geometry?". Coaches need trend
+data, not just current state. The AI also needs history to detect patterns like
+"mastery goes up during sessions but decays between them" (indicating a spaced
+repetition issue).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `student_id` | FK → StudentProfile | |
+| `snapshot_type` | enum | `session_end`, `weekly`, `plan_milestone`, `manual` |
+| `captured_at` | timestamp | When this snapshot was taken |
+| `trigger_session_id` | FK → TrainingSession | Session that triggered this snapshot (if session_end) |
+| `mastery_data` | json | Full mastery state: `{ "LO-PHP-01": { "level": "proficient", "confidence": 0.85 }, ... }` |
+| `summary_stats` | json | Aggregated stats: `{ "total_mastered": 42, "total_developing": 15, "by_domain": {...} }` |
+
+**Relationships:**
+- Belongs to → **StudentProfile**
+- Optionally triggered by → **TrainingSession**
+
+**Impact on existing model:**
+- `student_mastery` remains the live/current table (fast reads for recommendations)
+- `MasterySnapshot` is append-only (never updated, only inserted)
+- Together they give current state + full history without slowing down the hot path
+
+**Example:**
+```
+MasterySnapshot:
+  student: "Maria"
+  snapshot_type: session_end
+  captured_at: 2026-03-15T18:30:00Z
+  trigger_session_id: session-abc-123
+  summary_stats:
+    total_mastered: 42
+    total_proficient: 28
+    total_developing: 15
+    by_domain:
+      ALG: { mastered: 12, proficient: 8 }
+      NT: { mastered: 10, proficient: 6 }
+      GEO-S: { mastered: 5, proficient: 3 }
+      ...
+```
 
 ---
 
@@ -524,6 +702,86 @@ TrainingSession:
 
 ---
 
+### 11. Training Plan
+
+**Purpose:** A multi-week structured plan that sequences techniques and problems
+to close knowledge gaps and prepare for a target competition. Different from
+PersonalTrainingCollection (which is a flat problem set): a TrainingPlan has
+**temporal structure**, **milestones**, and **adaptive replanning**.
+
+**Why this is needed:** The taxonomy document describes a training plan generation
+algorithm, but the domain model had no entity to store the result. Without this,
+the AI generates plans that vanish — they can't be tracked, adapted, or compared
+to actual progress. Coaches also need to see and override plans.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `student_id` | FK → StudentProfile | Who this plan is for |
+| `title` | string | e.g. "USAMO 2027 — 12 Week Prep" |
+| `target_competition_id` | FK → Competition | What they're training for |
+| `start_date` | date | When the plan begins |
+| `end_date` | date | Target end date |
+| `total_weeks` | int | Plan duration |
+| `status` | enum | `draft`, `active`, `paused`, `completed`, `abandoned` |
+| `generation_method` | enum | `ai_generated`, `coach_created`, `hybrid` |
+| `priority_gaps_at_creation` | FK[] → KnowledgeGap | Gaps that drove this plan |
+| `created_at` | timestamp | |
+| `last_replanned_at` | timestamp | Last time the AI adapted the remaining weeks |
+
+**Plan weeks (separate table `plan_weeks`):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `plan_id` | FK → TrainingPlan | Parent plan |
+| `week_number` | int | 1-indexed week |
+| `theme` | string | e.g. "LTE prerequisites + Inversion intro" |
+| `focus_techniques` | FK[] → Technique | Primary techniques for this week |
+| `target_gaps` | FK[] → KnowledgeGap | Gaps this week aims to close |
+| `collection_id` | FK → PersonalTrainingCollection | Problem set for this week (auto-generated) |
+| `status` | enum | `upcoming`, `in_progress`, `completed`, `skipped`, `replanned` |
+| `notes` | text | Coach or AI notes on this week |
+
+**Relationships:**
+- Belongs to → **StudentProfile**
+- References → **Competition** (target)
+- Has many → **plan_weeks** (→ PersonalTrainingCollection, Technique, KnowledgeGap)
+- Each plan_week generates a → **PersonalTrainingCollection**
+- TrainingSessions feed back into plan evaluation
+
+**Impact on existing model:**
+- PersonalTrainingCollection gains an optional `plan_week_id` FK (linking it
+  to the plan that generated it)
+- TrainingSession can now reference a plan week for context
+- KnowledgeGap's `recommended_problems` can be delegated to the plan
+
+**Example:**
+```
+TrainingPlan:
+  student: "Maria"
+  title: "USAMO 2027 — 12 Week Prep"
+  status: active
+  total_weeks: 12
+
+  plan_weeks:
+    week 1:
+      theme: "Legendre's Formula (prerequisite repair)"
+      focus_techniques: [T-LEGENDRE]
+      status: completed
+    week 2:
+      theme: "LTE introduction + Power of a Point reinforcement"
+      focus_techniques: [T-LTE, T-POP]
+      status: in_progress
+    week 3:
+      theme: "LTE application + Radical Axis"
+      focus_techniques: [T-LTE, T-RADAXIS]
+      status: upcoming
+    ...
+```
+
+---
+
 ## Cross-Cutting Relationships Summary
 
 ```mermaid
@@ -535,19 +793,26 @@ erDiagram
     Subtopic }o--o{ Subtopic : "prerequisite of"
 
     Competition ||--o{ Problem : "source of"
+    Problem ||--o{ Solution : "solved by"
     Problem }o--o{ Topic : "tagged with"
     Problem }o--o{ Subtopic : "classified under"
     Problem }o--o{ Technique : "requires"
     Problem }o--o{ LearningObjective : "tests"
+    Problem }o--o{ Problem : "related to (ProblemRelationship)"
+    Solution }o--o{ Technique : "uses"
 
     StudentProfile ||--o{ KnowledgeGap : has
     StudentProfile }o--o{ LearningObjective : "mastery of"
+    StudentProfile ||--o{ MasterySnapshot : "history"
     StudentProfile ||--o{ PersonalTrainingCollection : owns
     StudentProfile ||--o{ TrainingSession : participates
+    StudentProfile ||--o{ TrainingPlan : follows
 
     KnowledgeGap }o--|| LearningObjective : targets
     KnowledgeGap }o--|| Technique : "related to"
 
+    TrainingPlan ||--o{ PersonalTrainingCollection : "generates weekly"
+    TrainingPlan }o--|| Competition : "targets"
     PersonalTrainingCollection }o--o{ Problem : curates
     PersonalTrainingCollection }o--o{ KnowledgeGap : addresses
 
@@ -555,6 +820,7 @@ erDiagram
     TrainingSession }o--o{ Technique : "focuses on"
     TrainingSession }o--o{ KnowledgeGap : "works on"
     TrainingSession }o--|| PersonalTrainingCollection : "sourced from"
+    TrainingSession ||--o{ MasterySnapshot : "triggers"
 ```
 
 ---
@@ -604,3 +870,77 @@ Same problems, different difficulty — driven by the model, not a label.
 | **KnowledgeGap as first-class entity** | Makes gap-driven recommendations explicit and auditable |
 | **Session → mastery feedback loop** | Every attempt updates the model; no stale profiles |
 | **Collection as flexible container** | Replaces rigid "problem set" with multi-purpose curation |
+| **Solution as first-class entity** | Enables technique-specific search and "try a different approach" coaching |
+| **ProblemRelationship graph** | Powers "similar problems", "easier variant", and problem ladders |
+| **MasterySnapshot history** | Enables progress tracking, regression detection, and trend reporting |
+| **TrainingPlan with weekly structure** | Turns ephemeral AI recommendations into trackable, adaptive plans |
+| **Problem lifecycle (draft → published)** | Supports PDF ingestion pipeline with human review before problems go live |
+| **Semantic embeddings on Problem** | Enables natural-language search and AI-powered similarity detection |
+
+---
+
+## Search & Retrieval Architecture
+
+The domain model is designed to support **three search modalities** via Azure AI
+Search:
+
+### 1. Structured Search (Filters)
+
+Uses the multi-dimensional classification fields directly:
+
+```
+Filter: competition_level = 'national'
+    AND techniques CONTAINS 'T-PHP'
+    AND creativity_demand IN ('insightful', 'inventive')
+    AND status = 'published'
+```
+
+**Indexed fields:** All enum fields on Problem, plus Topic/Subtopic/Technique
+codes from join tables (denormalised into the search index as string arrays).
+
+### 2. Semantic Search (Natural Language)
+
+Uses `statement_embedding` (vector field) for similarity:
+
+```
+Query: "problems about colouring integers to avoid arithmetic progressions"
+→ Vector similarity search on statement_embedding
+→ Returns problems whose statements are semantically close
+```
+
+**Embedding source:** Problem statement + solution sketch, embedded via Azure
+OpenAI `text-embedding-3-large`.
+
+### 3. Hybrid Search (Chat / Conversational)
+
+Combines structured filters with semantic search, orchestrated by Azure OpenAI:
+
+```
+User: "Give me 3 problems that would help Maria practice inversion,
+       at national level, that she hasn't seen before"
+
+→ AI decomposes into:
+  1. Filter: technique = T-INV, competition_level = national, status = published
+  2. Exclude: problems in Maria's session_attempts
+  3. Rank by: personalised_difficulty(problem, Maria) ∈ [0.3, 0.6]
+  4. Return top 3
+```
+
+### Search Index Schema (Azure AI Search)
+
+| Field | Type | Searchable | Filterable | Facetable |
+|-------|------|------------|------------|-----------|
+| `id` | string | — | ✓ | — |
+| `title` | string | ✓ | — | — |
+| `statement` | string | ✓ | — | — |
+| `statement_embedding` | vector(3072) | ✓ (vector) | — | — |
+| `topic_codes` | string[] | — | ✓ | ✓ |
+| `subtopic_codes` | string[] | — | ✓ | ✓ |
+| `technique_codes` | string[] | — | ✓ | ✓ |
+| `competition_level` | string | — | ✓ | ✓ |
+| `position_in_paper` | string | — | ✓ | ✓ |
+| `proof_style` | string | — | ✓ | ✓ |
+| `creativity_demand` | string | — | ✓ | ✓ |
+| `competition_abbrev` | string | — | ✓ | ✓ |
+| `source_year` | int | — | ✓ | ✓ |
+| `status` | string | — | ✓ | — |
