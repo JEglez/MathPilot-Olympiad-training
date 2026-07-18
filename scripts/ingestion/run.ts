@@ -51,18 +51,19 @@ const OmniMathSchema = z.object({
   problem:    z.string().min(1),
   solution:   z.string().nullable().optional(),
   answer:     z.string().nullable().optional(),
-  domain:     z.array(z.string()).optional(),
-  difficulty: z.number().optional(),
-  source:     z.string().optional(),
+  domain:     z.array(z.string()).nullable().optional(),
+  difficulty: z.number().nullable().optional(),
+  source:     z.string().nullable().optional(),
 });
 
 const OlympiadBenchSchema = z.object({
-  problem:    z.string().min(1),
-  solution:   z.string().nullable().optional(),
-  answer:     z.union([z.string(), z.array(z.string())]).nullable().optional(),
-  subject:    z.string().optional(),
-  difficulty: z.string().optional(),
-  source:     z.string().optional(),
+  question:           z.string().min(1),          // field is "question" not "problem"
+  final_answer:       z.union([z.string(), z.array(z.string())]).nullable().optional(),
+  subfield:           z.string().nullable().optional(),  // field is "subfield" not "subject"
+  source:             z.string().nullable().optional(),
+  is_multiple_answer: z.boolean().nullable().optional(),
+  answer_type:        z.string().nullable().optional(),  // null in many rows
+  // no "solution" or "difficulty" field in this dataset
 });
 
 const OlymMATHSchema = z.object({
@@ -77,7 +78,8 @@ const NuminaMathSchema = z.object({
   problem:    z.string().min(1),
   solution:   z.string().nullable().optional(),
   answer:     z.string().nullable().optional(),
-  source:     z.string().optional(),
+  source:     z.string().nullable().optional(),
+  messages:   z.array(z.unknown()).nullable().optional(),  // present but not used
 });
 
 // ── Parser helpers ────────────────────────────────────────────────────────────
@@ -122,19 +124,21 @@ function parseOmniMath(raw: unknown): CanonicalProblem {
 
 function parseOlympiadBench(raw: unknown): CanonicalProblem | null {
   const r    = OlympiadBenchSchema.parse(raw);
-  const subj = (r.subject ?? "").toLowerCase();
-  if (subj && !subj.includes("math") && (subj.includes("phys") || subj.includes("chem"))) return null;
-  const st = normaliseLaTeX(r.problem);
-  const h  = computeDedupHash(r.problem);
-  const c  = resolveCompetition(r.source);
-  const ans = Array.isArray(r.answer) ? r.answer.join("; ") : (r.answer ?? null);
+  const subj = (r.subfield ?? "").toLowerCase();
+  // Only keep math subjects; skip physics, chemistry, biology, etc.
+  const MATH_SUBFIELDS = new Set(["geometry", "algebra", "combinatorics", "number theory"]);
+  if (subj && !MATH_SUBFIELDS.has(subj)) return null;
+  const st = normaliseLaTeX(r.question);
+  const h  = computeDedupHash(r.question);
+  const c  = resolveCompetition(r.source ?? undefined);
+  const ans = Array.isArray(r.final_answer) ? r.final_answer.join("; ") : (r.final_answer ?? null);
   return {
     externalId: `olympiad-bench::${h}`, sourceDataset: "olympiad-bench", dedupHash: h,
-    title: makeTitle(st), statement: st, statementPlain: stripLaTeX(r.problem),
-    answer: ans, solutions: solution(r.solution), language: "en",
+    title: makeTitle(st), statement: st, statementPlain: stripLaTeX(r.question),
+    answer: ans, solutions: [], language: "en",
     sourceCompetition: c?.abbreviation ?? null,
     sourceDomainPath: null,
-    sourceSubject: r.subject ?? null, sourceDifficulty: null,  // difficulty is text rating, not numeric
+    sourceSubject: r.subfield ?? null, sourceDifficulty: null,
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
     competitionLevel: c?.level ?? null, positionInPaper: null, techniqueDepth: null,
@@ -212,8 +216,14 @@ async function main(): Promise<void> {
     const baseUrl = HF_URLS[source];
     if (!parser || !baseUrl) throw new Error(`Unknown source: ${source}`);
 
+    // NuminaMath-CoT has ~860k rows; cap at 5k to avoid rate limits.
+    // The olympiad filter keeps ~10%, yielding ~500 olympiad problems.
+    // Use a longer page delay to stay within HuggingFace rate limits.
+    const fetchOptions = source === "numina-math" ? { maxRows: 5_000, pageDelayMs: 1_500 } : { pageDelayMs: 200 };
+
     const raw = await fetchHuggingFaceDataset(source, baseUrl, CACHE,
       e => log("fetch:page", { source, ...e }),
+      fetchOptions,
     );
     log("fetch:done", { source, total: raw.length });
 
