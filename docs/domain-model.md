@@ -242,9 +242,10 @@ multiple axes rather than a single difficulty number.
 |-------|------|-------------|
 | `competition_level` | enum | `local`, `state`, `national`, `international` — which stage of the olympiad pipeline |
 | `position_in_paper` | enum | `early`, `middle`, `late` — position within the specific competition paper |
-| `proof_style` | enum | `construction`, `existence`, `bound`, `characterisation`, `computation` |
-| `creativity_demand` | enum | `low`, `medium`, `high`, `extreme` |
-| `multi_technique_depth` | int | How many distinct techniques are combined (1–5+) |
+| `technique_depth` | enum | `single`, `compound`, `synthesis` — how many distinct techniques must be combined |
+| `creativity_demand` | enum | `routine`, `insightful`, `inventive`, `breakthrough` |
+| `proof_style` | enum | `computation`, `existence`, `construction`, `bound`, `characterisation`, `impossibility` |
+| `entry_barrier` | enum | `transparent`, `camouflaged`, `deceptive` — how hard it is to identify the right approach |
 
 **Why no single `difficulty` field?**
 
@@ -258,7 +259,7 @@ international), while the system computes **personalised difficulty** at query t
 personalised_difficulty(problem, student) =
     f(problem.required_techniques,
       student.mastery_levels,
-      problem.multi_technique_depth,
+      problem.technique_depth,
       problem.creativity_demand)
 ```
 
@@ -297,8 +298,8 @@ Problem:
   competition_level: international
   position_in_paper: middle
   proof_style: existence
-  creativity_demand: high
-  multi_technique_depth: 2
+  creativity_demand: inventive
+  technique_depth: compound
   topics: [Combinatorics]
   subtopics: [Extremal Combinatorics, Graph Colouring]
   techniques: [Pigeonhole Principle (primary), Double Counting]
@@ -878,7 +879,7 @@ Instead of `problem.difficulty = 7`, the system computes:
                     │                              │
                     │  = f( required_techniques,   │
                     │       student_mastery,        │
-                    │       multi_technique_depth,  │
+                    │       technique_depth,        │
                     │       creativity_demand,      │
                     │       competition_level )     │
                     └──────────────────────────────┘
