@@ -189,8 +189,8 @@ scale with the number of **problems ingested**, not the number of **users served
 
 - [x] System Architecture and Domain Model — see `docs/domain-model.md`, `docs/plan/02-mvp-architecture.md`
 - [ ] Technology Stack Decisions
-- [ ] Development Roadmap (Phased)
-- [ ] Azure Cost Strategy
+- [x] Development Roadmap (Phased) — see `docs/plan/04-mvp-implementation-roadmap.md`
+- [x] Azure Cost Strategy — see `docs/plan/02-mvp-architecture.md` §6, `docs/plan/03-dataset-import-search.md` §10
 - [ ] AI Strategy
 - [x] Classification Taxonomy Design — see `docs/taxonomy.md` and `docs/taxonomy-integration.md`
 - [ ] Backlog (Epics, Features, User Stories)
