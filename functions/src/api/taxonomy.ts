@@ -65,17 +65,17 @@ export async function taxonomyHandler(
       pool.query<{ id: string; topic_id: string; code: string; name: string; description: string }>(
         "SELECT id, topic_id, code, name, description FROM subtopics ORDER BY code",
       ),
-      pool.query<{ id: string; subtopic_id: string; code: string; name: string; description: string; cognitive_load: string }>(
-        "SELECT id, subtopic_id, code, name, description, cognitive_load FROM techniques ORDER BY code",
+      pool.query<{ id: string; primary_subtopic_id: string; code: string; name: string; description: string; cognitive_load: string }>(
+        "SELECT id, primary_subtopic_id, code, name, description, cognitive_load FROM techniques ORDER BY code",
       ),
     ]);
 
     // Build tree in memory — taxonomy fits comfortably in memory (~160 techniques)
     const techniquesBySubtopic = new Map<string, TechniqueNode[]>();
     for (const tech of techniquesResult.rows) {
-      const list = techniquesBySubtopic.get(tech.subtopic_id) ?? [];
+      const list = techniquesBySubtopic.get(tech.primary_subtopic_id) ?? [];
       list.push({ id: tech.id, code: tech.code, name: tech.name, description: tech.description, cognitive_load: tech.cognitive_load });
-      techniquesBySubtopic.set(tech.subtopic_id, list);
+      techniquesBySubtopic.set(tech.primary_subtopic_id, list);
     }
 
     const subtopicsByTopic = new Map<string, SubtopicNode[]>();

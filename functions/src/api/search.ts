@@ -15,7 +15,7 @@ import {
   rowToProblemCard,
   PROBLEM_CARD_SELECT,
   PROBLEM_CARD_JOINS,
-  PROBLEM_CARD_GROUP_BY,
+  PROBLEM_CARD_GROUP_BY_RRF,
   validationError,
   internalError,
   type SearchResponse,
@@ -155,7 +155,7 @@ FROM rrf
 JOIN problems p ON rrf.id = p.id
 ${PROBLEM_CARD_JOINS}
 ${whereClause}
-${PROBLEM_CARD_GROUP_BY}
+${PROBLEM_CARD_GROUP_BY_RRF}
 ORDER BY rrf.rrf_score DESC
 LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `.trim();
@@ -170,7 +170,7 @@ FROM problems p,
      plainto_tsquery('english', $2) q
 ${PROBLEM_CARD_JOINS}
 ${whereClause ? `${whereClause} AND p.search_tsv @@ q` : "WHERE p.search_tsv @@ q"}
-${PROBLEM_CARD_GROUP_BY}
+${PROBLEM_CARD_GROUP_BY_RRF}
 ORDER BY search_score DESC
 LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `.trim();

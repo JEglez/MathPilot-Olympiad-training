@@ -4,11 +4,13 @@
   "private": true,
   "engines": { "node": ">=20" },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc",
+    "build:check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "import": "tsx ../../scripts/ingestion/run.ts"
   },
+  "main": "dist/api/!(*.test).js",
   "dependencies": {
     "@azure/functions": "4.5.0",
     "pg": "8.11.3",

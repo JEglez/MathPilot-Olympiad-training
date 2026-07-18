@@ -245,6 +245,9 @@ export const PROBLEM_CARD_JOINS = `
 /** GROUP BY needed when using json_agg in PROBLEM_CARD_SELECT */
 export const PROBLEM_CARD_GROUP_BY = `GROUP BY p.id, c.abbreviation`;
 
+/** GROUP BY for hybrid search queries — includes rrf.rrf_score from the CTE */
+export const PROBLEM_CARD_GROUP_BY_RRF = `GROUP BY p.id, c.abbreviation, rrf.rrf_score`;
+
 // ── DB row → ProblemCard mapper ───────────────────────────────────────────────
 
 interface RawProblemRow {
