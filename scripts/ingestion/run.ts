@@ -36,12 +36,12 @@ function requireEnv(name: string): string {
 
 // ── Source registry ───────────────────────────────────────────────────────────
 
-const SOURCE_ORDER = ["omni-math", "olympiad-bench", "numina-math", "olympmath"] as const;
+const SOURCE_ORDER = ["omni-math", "olympiad-bench", "numina-math"] as const;
 
 const HF_URLS: Record<string, string> = {
   "omni-math":      "https://datasets-server.huggingface.co/rows?dataset=KbsdJames%2FOmni-MATH&config=default&split=test",
-  "olympiad-bench": "https://datasets-server.huggingface.co/rows?dataset=lmms-lab%2FOlympiadBench&config=default&split=test",
-  "olympmath":      "https://datasets-server.huggingface.co/rows?dataset=Hothan%2FOlymMATH&config=default&split=test",
+  "olympiad-bench": "https://datasets-server.huggingface.co/rows?dataset=lmms-lab%2FOlympiadBench&config=default&split=test_en",
+  // olympmath (Hothan/OlymMATH) is private/gated — skipped until access is granted
   "numina-math":    "https://datasets-server.huggingface.co/rows?dataset=AI-MO%2FNuminaMath-CoT&config=default&split=train",
 };
 

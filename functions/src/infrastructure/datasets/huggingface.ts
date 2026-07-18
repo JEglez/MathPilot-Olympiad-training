@@ -16,7 +16,8 @@ export interface FetchPageEvent {
 }
 
 /**
- * Fetch all rows from a HuggingFace Datasets Server URL (paginated, 1 000 rows/page).
+ * Fetch all rows from a HuggingFace Datasets Server URL (paginated, 100 rows/page).
+ * The HuggingFace Datasets Server API enforces a max of 100 rows per request.
  * Writes a local JSON cache on first fetch; subsequent calls return the cached file.
  * Returns raw `unknown[]` — callers must validate with their own Zod schema.
  */
@@ -34,7 +35,7 @@ export async function fetchHuggingFaceDataset(
   }
 
   const all: unknown[] = [];
-  const PAGE = 1_000;
+  const PAGE = 100; // HuggingFace Datasets Server max is 100 rows/request
   let offset = 0;
 
   while (true) {
