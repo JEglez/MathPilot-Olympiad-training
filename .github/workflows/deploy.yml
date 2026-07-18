@@ -2,9 +2,13 @@
 # Deploys Bicep templates to Azure, then optionally runs DB migrations and seeds taxonomy.
 #
 # Required GitHub Secrets:
-#   AZURE_CREDENTIALS            — service principal JSON (az ad sp create-for-rbac --sdk-auth)
+#   AZURE_CREDENTIALS            — service principal JSON:
+#                                  az ad sp create-for-rbac --name "mathpilot-github" \
+#                                    --role contributor \
+#                                    --scopes /subscriptions/<sub-id> \
+#                                    --sdk-auth
+#                                  (subscription scope needed to register resource providers)
 #   AZURE_RESOURCE_GROUP         — target resource group (e.g. rg-omm)
-#   AZURE_SUBSCRIPTION_ID        — Azure subscription ID
 #   MATHPILOT_PG_ADMIN_PASSWORD  — strong password for the PostgreSQL admin user
 #
 # After first deploy the workflow prints the secrets to add for the Ingestion workflow:
@@ -47,6 +51,15 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── Register resource providers (idempotent, needed on first run) ──────────
+
+      - name: Register Azure resource providers
+        run: |
+          echo "Registering resource providers..."
+          az provider register --namespace Microsoft.DBforPostgreSQL --wait
+          az provider register --namespace Microsoft.CognitiveServices --wait
+          echo "✅ Providers registered"
 
       # ── Bicep deployment ─────────────────────────────────────────────────────
 
