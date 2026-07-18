@@ -187,11 +187,11 @@ scale with the number of **problems ingested**, not the number of **users served
 
 ## Next Steps
 
-- [ ] System Architecture and Domain Model
+- [x] System Architecture and Domain Model — see `docs/domain-model.md`
 - [ ] Technology Stack Decisions
 - [ ] Development Roadmap (Phased)
 - [ ] Azure Cost Strategy
 - [ ] AI Strategy
-- [ ] Classification Taxonomy Design
+- [x] Classification Taxonomy Design — see `docs/taxonomy.md` and `docs/taxonomy-integration.md`
 - [ ] Backlog (Epics, Features, User Stories)
 - [ ] Future Vision

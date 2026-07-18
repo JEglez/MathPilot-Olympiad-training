@@ -38,9 +38,8 @@ owns it.
 │                                 │     │    position_in_paper                 │
 │                                 │     │    proof_style                       │
 │                                 │     │    creativity_demand                 │
-│                                 │     │    multi_technique_depth             │
-│                                 │     │  (+ technique_depth & entry_barrier  │
-│                                 │     │   from taxonomy, to be added)        │
+│                                 │     │    technique_depth                   │
+│                                 │     │    entry_barrier                     │
 │                                 │     │                                      │
 │  Layer 7: Recommendation Rules ─┼────▶│  NOT stored. Domain logic that reads │
 │                                 │     │  from Problem + StudentProfile +     │
@@ -94,7 +93,8 @@ Problem
   ├── position_in_paper                            ← from taxonomy Layer 6, Dimension 1b
   ├── proof_style                                  ← from taxonomy Layer 6, Dimension 4
   ├── creativity_demand                            ← from taxonomy Layer 6, Dimension 3
-  ├── multi_technique_depth                        ← from taxonomy Layer 6, Dimension 2
+  ├── technique_depth                              ← from taxonomy Layer 6, Dimension 2
+  ├── entry_barrier                                ← from taxonomy Layer 6, Dimension 5
   └── (via join tables)
       ├── problem_topics[]                         ← which domains
       ├── problem_subtopics[]                      ← which subtopics
@@ -109,7 +109,7 @@ any entity** — they are functions.
 
 | Derived Attribute | Inputs | Output | Where Used |
 |-------------------|--------|--------|------------|
-| `personalised_difficulty(problem, student)` | Problem.techniques, Problem.creativity_demand, Problem.multi_technique_depth, StudentProfile.mastery | float [0, 1] | Recommendations, search ranking |
+| `personalised_difficulty(problem, student)` | Problem.techniques, Problem.creativity_demand, Problem.technique_depth, StudentProfile.mastery | float [0, 1] | Recommendations, search ranking |
 | `technique_gap(student, technique)` | StudentProfile.mastery for the technique's LOs | float [0, 1] | Gap analysis, plan generation |
 | `readiness(student, problem)` | Prerequisite DAG + student mastery | bool | "Is the student ready for this problem?" |
 | `competition_level_match(student, problem)` | Student's mastered tier vs problem's competition_level | bool | Filter: "show me problems at my level" |
@@ -404,25 +404,25 @@ TrainingSession completed
 
 ---
 
-## 5. Missing Fields to Add to Problem Entity
+## 5. Complexity Dimension Alignment (Verified)
 
-The taxonomy defines 6 complexity dimensions, but the domain model only stores 5
-of them. Two fields from the taxonomy are not yet on the Problem entity:
+All 6 taxonomy complexity dimensions are present on the Problem entity in
+`domain-model.md`. The following table confirms alignment:
 
-| Taxonomy Dimension | Domain Model Field | Status |
-|--------------------|--------------------|--------|
-| Competition Level | `competition_level` | ✅ Exists |
-| Position in Paper | `position_in_paper` | ✅ Exists |
-| Technique Depth | `multi_technique_depth` (int) | ⚠️ Exists as int, but taxonomy uses enum (`single`/`compound`/`synthesis`) |
-| Creativity Demand | `creativity_demand` | ✅ Exists |
-| Proof Style | `proof_style` | ✅ Exists |
-| Entry Barrier | — | ❌ **Missing** |
-| Estimated Solve Time | — | ⚠️ `estimated_solve_time_minutes` exists as int, but taxonomy uses enum (`quick`/`standard`/`extended`/`marathon`) |
+| Taxonomy Dimension | Domain Model Field | Type | Status |
+|--------------------|--------------------|------|--------|
+| Competition Level | `competition_level` | enum: `local`, `state`, `national`, `international` | ✅ Aligned |
+| Position in Paper | `position_in_paper` | enum: `early`, `middle`, `late` | ✅ Aligned |
+| Technique Depth | `technique_depth` | enum: `single`, `compound`, `synthesis` | ✅ Aligned |
+| Creativity Demand | `creativity_demand` | enum: `routine`, `insightful`, `inventive`, `breakthrough` | ✅ Aligned |
+| Proof Style | `proof_style` | enum: `computation`, `existence`, `construction`, `bound`, `characterisation`, `impossibility` | ✅ Aligned |
+| Entry Barrier | `entry_barrier` | enum: `transparent`, `camouflaged`, `deceptive` | ✅ Aligned |
 
-### Recommended Changes
-
-1. **Add `entry_barrier`** enum field to Problem: `transparent`, `camouflaged`, `deceptive`
-2. **Replace `multi_technique_depth` (int)** with `technique_depth` enum: `single`, `compound`, `synthesis` — aligns with taxonomy and the personalised difficulty formula which uses these exact enum values
+**Note on estimated solve time:** The Problem entity stores `estimated_solve_time_minutes`
+as an integer (continuous value in minutes). The taxonomy defines a coarser enum
+(`quick` / `standard` / `extended` / `marathon`). The int representation is kept on
+the entity because it is more precise; the enum categories from the taxonomy can be
+derived from the int value at query time using range thresholds.
 
 ---
 

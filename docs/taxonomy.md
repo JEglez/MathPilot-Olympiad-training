@@ -709,6 +709,10 @@ For a student who knows the required techniques.
 | `extended` | 45–90 minutes |
 | `marathon` | > 90 minutes |
 
+> **Domain model note:** The Problem entity stores `estimated_solve_time_minutes`
+> as an integer for precision. These categories are derived from the int value
+> at query time using the thresholds above.
+
 ### Worked Example: Full Classification
 
 **Problem:** *IMO 2019 Problem 2 (Geometry)*

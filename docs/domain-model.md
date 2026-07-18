@@ -457,7 +457,7 @@ Used for provenance, filtering, and calibrating problem expectations.
 | `name` | string | "International Mathematical Olympiad" |
 | `abbreviation` | string | "IMO" |
 | `country` | string | Country or "International" |
-| `level` | enum | `school`, `regional`, `national`, `international` |
+| `level` | enum | `local`, `state`, `national`, `international` |
 | `typical_position_count` | int | Number of problems per paper (e.g. 6 for IMO) |
 | `description` | text | Background, format, history |
 | `website_url` | string | Official site |
@@ -466,13 +466,18 @@ Used for provenance, filtering, and calibrating problem expectations.
 **Relationships:**
 - Has many → **Problem**
 
-**Examples:**
+**Note:** `Competition.level` uses the same enum as `Problem.competition_level`
+(`local`, `state`, `national`, `international`). A competition's level indicates
+the pipeline stage it belongs to. A problem's `competition_level` indicates which
+stage a student needs to be at to attempt it — usually matching its source
+competition, but not always (e.g., an easy problem from a national competition
+may be classified as `state` level).
 | abbreviation | name | level |
 |-------------|------|-------|
 | `IMO` | International Mathematical Olympiad | international |
 | `USAMO` | USA Mathematical Olympiad | national |
 | `EGMO` | European Girls' Mathematical Olympiad | international |
-| `AMC12` | American Mathematics Competition 12 | school |
+| `AMC12` | American Mathematics Competition 12 | local |
 | `ISL` | IMO Shortlist | international |
 
 ---
