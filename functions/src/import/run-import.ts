@@ -137,15 +137,78 @@ async function main(): Promise<void> {
   }
 }
 
-/** Fetch raw dataset records — implement per source */
+/** Fetch raw dataset records from HuggingFace datasets API or local cache */
 async function fetchDataset(source: string): Promise<unknown[]> {
-  // TODO(#dataset-fetch): Implement actual HuggingFace/GitHub download per source
-  // Each source should:
-  //   - Download to a local cache (or read if already cached)
-  //   - Return parsed records as an array
-  // For now, return empty array so CLI can be invoked without network
-  console.log(`  [fetch] ${source} — implement dataset download here`);
-  return [];
+  // Each dataset is available as a Parquet file on HuggingFace
+  // We download to a local cache dir and parse to avoid re-fetching
+  const cacheDir = process.env["MATHPILOT_DATASET_CACHE"] ?? ".dataset-cache";
+  const cacheFile = `${cacheDir}/${source}.json`;
+
+  // Check local cache first
+  try {
+    const { readFileSync, existsSync } = await import("fs");
+    if (existsSync(cacheFile)) {
+      console.log(`  [fetch] ${source} — loading from cache ${cacheFile}`);
+      return JSON.parse(readFileSync(cacheFile, "utf-8")) as unknown[];
+    }
+  } catch {
+    // Cache miss — fall through to download
+  }
+
+  // Dataset sources per 03-dataset-import-search.md §3
+  const DATASET_URLS: Record<string, string> = {
+    "omni-math":
+      "https://datasets-server.huggingface.co/rows?dataset=KbsdJames%2FOmni-MATH&config=default&split=test&offset=0&length=100",
+    "olympiad-bench":
+      "https://datasets-server.huggingface.co/rows?dataset=lmms-lab%2FOlympiadBench&config=default&split=test&offset=0&length=100",
+    "olympmath":
+      "https://datasets-server.huggingface.co/rows?dataset=Hothan%2FOlymMATH&config=default&split=test&offset=0&length=100",
+    "numina-math":
+      "https://datasets-server.huggingface.co/rows?dataset=AI-MO%2FNuminaMath-CoT&config=default&split=train&offset=0&length=100",
+  };
+
+  const url = DATASET_URLS[source];
+  if (!url) throw new Error(`No dataset URL configured for source: ${source}`);
+
+  console.log(`  [fetch] ${source} — downloading from HuggingFace`);
+
+  // HuggingFace datasets-server returns { rows: [{ row: {...} }] }
+  // For full datasets, paginate with offset/length until rows is empty
+  const allRows: unknown[] = [];
+  const PAGE_SIZE = 1_000;
+  let offset = 0;
+
+  while (true) {
+    const pageUrl = buildPageUrl(url, offset, PAGE_SIZE);
+    const res = await fetch(pageUrl);
+    if (!res.ok) {
+      throw new Error(`HuggingFace fetch failed: ${res.status} ${res.statusText} — ${pageUrl}`);
+    }
+
+    const data = await res.json() as { rows?: Array<{ row: unknown }> };
+    const rows = data.rows ?? [];
+    allRows.push(...rows.map(r => r.row));
+
+    if (rows.length < PAGE_SIZE) break; // last page
+    offset += PAGE_SIZE;
+
+    console.log(`  [fetch] ${source} — downloaded ${allRows.length} records`);
+  }
+
+  // Cache to disk for subsequent runs
+  const { mkdirSync, writeFileSync } = await import("fs");
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(cacheFile, JSON.stringify(allRows), "utf-8");
+  console.log(`  [fetch] ${source} — cached ${allRows.length} records to ${cacheFile}`);
+
+  return allRows;
+}
+
+function buildPageUrl(baseUrl: string, offset: number, length: number): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set("offset", String(offset));
+  url.searchParams.set("length", String(length));
+  return url.toString();
 }
 
 main().catch(e => {

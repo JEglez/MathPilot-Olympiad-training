@@ -94,12 +94,130 @@ export class OpenAIClassifier {
       metadata: { prompt_version: CLASSIFICATION_PROMPT_VERSION },
     }));
 
-    // TODO: Upload batchLines JSONL to Azure OpenAI Files API,
-    //       create batch job, poll until completed, parse output file.
-    //       Stubbed here — implement with actual fetch calls to Azure OpenAI.
-    void batchLines;
+    const results = new Map<string, Result<ClassificationOutput, ClassifyError>>();
 
-    return new Map();
+    // Step 1: Upload JSONL file to Azure OpenAI Files API
+    const jsonlBody = batchLines.join("\n");
+    const formData = new FormData();
+    formData.append("purpose", "batch");
+    formData.append("file", new Blob([jsonlBody], { type: "application/jsonl" }), "batch.jsonl");
+
+    const uploadRes = await fetchWithTimeout(
+      `${this.config.endpoint}/openai/files?api-version=2024-07-01-preview`,
+      { method: "POST", headers: { "api-key": this.config.apiKey }, body: formData },
+    );
+    if (!uploadRes.ok) {
+      this.recordFailure();
+      for (const p of problems) {
+        results.set(p.externalId, err({ kind: "api_error", message: `File upload failed: ${uploadRes.status}` }));
+      }
+      return results;
+    }
+    const { id: fileId } = await uploadRes.json() as { id: string };
+
+    // Step 2: Create batch job
+    const batchRes = await fetchWithTimeout(
+      `${this.config.endpoint}/openai/batches?api-version=2024-07-01-preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "api-key": this.config.apiKey },
+        body: JSON.stringify({
+          input_file_id: fileId,
+          endpoint: "/v1/chat/completions",
+          completion_window: "24h",
+        }),
+      },
+    );
+    if (!batchRes.ok) {
+      this.recordFailure();
+      for (const p of problems) {
+        results.set(p.externalId, err({ kind: "api_error", message: `Batch create failed: ${batchRes.status}` }));
+      }
+      return results;
+    }
+    const { id: batchId } = await batchRes.json() as { id: string };
+
+    // Step 3: Poll until completed (max 24h, 30s intervals with exponential backoff cap)
+    let outputFileId: string | null = null;
+    const POLL_START_MS = 30_000;
+    const POLL_MAX_MS = 300_000;  // 5 minutes
+    const POLL_DEADLINE = Date.now() + 24 * 60 * 60 * 1_000;
+    let pollInterval = POLL_START_MS;
+
+    while (Date.now() < POLL_DEADLINE) {
+      await sleep(pollInterval);
+      pollInterval = Math.min(pollInterval * 1.5, POLL_MAX_MS);
+
+      const statusRes = await fetchWithTimeout(
+        `${this.config.endpoint}/openai/batches/${batchId}?api-version=2024-07-01-preview`,
+        { headers: { "api-key": this.config.apiKey } },
+      );
+      if (!statusRes.ok) continue;
+
+      const status = await statusRes.json() as { status: string; output_file_id?: string; error_file_id?: string };
+
+      if (status.status === "completed" && status.output_file_id) {
+        outputFileId = status.output_file_id;
+        break;
+      }
+      if (status.status === "failed" || status.status === "cancelled" || status.status === "expired") {
+        this.recordFailure();
+        for (const p of problems) {
+          results.set(p.externalId, err({ kind: "api_error", message: `Batch ${status.status}` }));
+        }
+        return results;
+      }
+      // statuses "validating" | "in_progress" | "finalizing" → keep polling
+    }
+
+    if (!outputFileId) {
+      this.recordFailure();
+      for (const p of problems) {
+        results.set(p.externalId, err({ kind: "timeout" }));
+      }
+      return results;
+    }
+
+    // Step 4: Download output file and parse per-request results
+    const downloadRes = await fetchWithTimeout(
+      `${this.config.endpoint}/openai/files/${outputFileId}/content?api-version=2024-07-01-preview`,
+      { headers: { "api-key": this.config.apiKey } },
+    );
+    if (!downloadRes.ok) {
+      this.recordFailure();
+      for (const p of problems) {
+        results.set(p.externalId, err({ kind: "api_error", message: `Output download failed: ${downloadRes.status}` }));
+      }
+      return results;
+    }
+
+    const outputText = await downloadRes.text();
+    for (const line of outputText.split("\n")) {
+      if (!line.trim()) continue;
+      type BatchOutputLine = {
+        custom_id: string;
+        response?: { status_code: number; body: { choices: Array<{ message: { content: string } }> } };
+        error?: { message: string };
+      };
+      const parsed = JSON.parse(line) as BatchOutputLine;
+      const { custom_id, response, error } = parsed;
+
+      if (error ?? !response) {
+        results.set(custom_id, err({ kind: "api_error", message: error?.message ?? "missing response" }));
+        continue;
+      }
+
+      const content = response.body.choices[0]?.message.content ?? "";
+      const parseResult = ClassificationOutputSchema.safeParse(JSON.parse(content));
+      if (!parseResult.success) {
+        results.set(custom_id, err({ kind: "invalid_output", raw: content }));
+      } else {
+        this.recordSuccess();
+        results.set(custom_id, ok(parseResult.data));
+      }
+    }
+
+    return results;
   }
 
   /** Classify a single problem synchronously (fallback when Batch API unavailable) */
@@ -221,7 +339,7 @@ function parseClassificationOutput(
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
-  timeoutMs: number,
+  timeoutMs = 120_000,
 ): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -230,6 +348,10 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(id);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /** Map parsed ClassificationOutput onto a CanonicalProblem (apply classification) */
