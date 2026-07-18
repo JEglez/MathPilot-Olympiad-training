@@ -187,7 +187,7 @@ scale with the number of **problems ingested**, not the number of **users served
 
 ## Next Steps
 
-- [x] System Architecture and Domain Model — see `docs/domain-model.md`
+- [x] System Architecture and Domain Model — see `docs/domain-model.md`, `docs/plan/02-mvp-architecture.md`
 - [ ] Technology Stack Decisions
 - [ ] Development Roadmap (Phased)
 - [ ] Azure Cost Strategy
