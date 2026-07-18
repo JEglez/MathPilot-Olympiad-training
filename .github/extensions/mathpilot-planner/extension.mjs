@@ -10,7 +10,15 @@ import { joinSession } from "@github/copilot-sdk/extension";
 const PLANNING_TEMPLATE = `
 ## Planning Instructions
 
-Before making decisions, read the relevant governance docs with the view tool:
+**First: classify this work.**
+
+> Is this a **service** (user-facing, always-on, part of the main application)?
+> Or an **operational script** (one-time/sporadic, no users, data import, backups, benchmarks)?
+>
+> - **Service** → apply all DDD rules below (layered architecture, Result<T,E>, branded IDs, etc.)
+> - **Script** → use flat structure in \`scripts/<purpose>/\`, see architecture-principles.md §11
+
+If it's a **service**, read the relevant governance docs with the view tool:
 
 | Doc | Path |
 |-----|------|
@@ -24,16 +32,18 @@ Before making decisions, read the relevant governance docs with the view tool:
 
 Structure your plan as:
 1. **Objective** — what and why
-2. **Constitution check** — read constitution.md, cite which tenets apply
-3. **Architecture** — read architecture-principles.md, identify layers/contexts
-4. **Implementation steps** — ordered tasks with file paths and layer assignments
-5. **Type design** — branded IDs, discriminated unions, Zod schemas
-6. **Error handling** — Result<T, E> types and boundary error mapping
-7. **Testing strategy** — read testing-standards.md, plan tests/factories
-8. **AI considerations** — if applicable: read ai-guidelines.md
-9. **ADR needed?** — flag if Architecture Decision Record is required
-10. **Performance & cost** — budget impact and optimization notes
+2. **Script or Service?** — explicitly state which category (architecture-principles.md §11)
+3. **Constitution check** — read constitution.md, cite which tenets apply
+4. **Architecture** — read architecture-principles.md, identify layers/contexts
+5. **Implementation steps** — ordered tasks with file paths and layer assignments
+6. **Type design** — branded IDs, discriminated unions, Zod schemas (service only)
+7. **Error handling** — Result<T, E> types (service) or throw/exit (script)
+8. **Testing strategy** — read testing-standards.md, plan tests/factories
+9. **AI considerations** — if applicable: read ai-guidelines.md
+10. **ADR needed?** — flag if Architecture Decision Record is required
+11. **Performance & cost** — budget impact and optimization notes
 `;
+
 
 // ─── Extension entry point ─────────────────────────────────────────────────
 
@@ -67,6 +77,18 @@ const session = await joinSession({
         onPreToolUse: async (input) => {
             if (input.toolName === "create" || input.toolName === "edit") {
                 const path = String(input.toolArgs?.path || "");
+
+                // Scripts are exempt from DDD layer enforcement (architecture-principles.md §11)
+                const isScript = path.includes("/scripts/") || path.includes("\\scripts\\");
+                if (isScript) {
+                    return {
+                        additionalContext:
+                            "SCRIPT MODE: This file is in scripts/ — flat structure applies. " +
+                            "DDD layers, Result<T,E>, and branded IDs are NOT required. " +
+                            "Still required: env vars for secrets, Zod for external data, idempotency, exit code 1 on failure. " +
+                            "See docs/governance/architecture-principles.md §11.",
+                    };
+                }
 
                 if (path.includes("/domain/") || path.includes("\\domain\\")) {
                     return {
@@ -152,8 +174,8 @@ const session = await joinSession({
                 if (plan.includes("embedding") && plan.includes("runtime") && !plan.includes("pre-comput")) {
                     warnings.push("AI [§4.2]: Embeddings should be pre-computed.");
                 }
-                if (plan.includes("throw") && !plan.includes("result<") && !plan.includes("result type")) {
-                    warnings.push("CODING [§6]: Prefer Result<T, E> over thrown exceptions.");
+                if (plan.includes("throw") && !plan.includes("result<") && !plan.includes("result type") && !plan.includes("script")) {
+                    warnings.push("CODING [§6]: Prefer Result<T, E> over thrown exceptions (unless this is an operational script — see architecture-principles.md §11).");
                 }
 
                 let report = "# Plan Compliance Report\n\n";

@@ -73,9 +73,21 @@ const TEMPLATES = {
         },
         required: ["number", "name"],
     },
-    "test-factory": {
+    "script": {
         description:
-            "Scaffold a test data factory function (buildProblem, buildTechnique, etc.) " +
+            "Scaffold a flat operational script in scripts/<name>/ with GitHub Actions " +
+            "workflow_dispatch trigger. No DDD layers — throw/process.exit, Zod at external " +
+            "boundaries, idempotent, env vars for secrets. " +
+            "See architecture-principles.md §11.",
+        params: {
+            name: "Script name in kebab-case (e.g., ingestion, taxonomy-update, benchmark)",
+            purpose: "One-line description of what the script does",
+            schedule: "Optional cron expression for recurring scripts (e.g., '0 2 * * 0' for weekly). Omit for one-time scripts.",
+        },
+        required: ["name", "purpose"],
+    },
+    "test-factory": {
+        description: +
             "that produces valid defaults with optional overrides.",
         params: {
             entity: "PascalCase entity name (e.g., Problem, Technique, Topic)",
@@ -501,6 +513,132 @@ export function build${entity}(overrides?: Partial<Record<string, unknown>>): Re
     };
 }
 
+function generateScript(args) {
+    const { name, purpose, schedule } = args;
+    const pascal = toPascal(name);
+    const scriptPath = `scripts/${name}/run.js`;
+    const pkgPath = `scripts/${name}/package.json`;
+    const workflowPath = `.github/workflows/${name}.yml`;
+
+    const scheduleTrigger = schedule
+        ? `\n  schedule:\n    - cron: '${schedule}'`
+        : "";
+
+    const scriptContent = `#!/usr/bin/env node
+// scripts/${name}/run.js
+// Purpose: ${purpose}
+// Run:     node scripts/${name}/run.js
+//          MATHPILOT_DB_URL=... node scripts/${name}/run.js
+//
+// Rules (architecture-principles.md §11):
+//   - No DDD layers. Throw on unrecoverable errors.
+//   - Zod for all external data (DB rows, API responses, file input).
+//   - Idempotent: safe to re-run without corrupting data.
+//   - Secrets from environment variables only.
+//   - Exit code 1 on failure so CI/GitHub Actions detects it.
+
+import { z } from "zod";
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(\`Missing required environment variable: \${name}\`);
+  return value;
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function main() {
+  // TODO: implement ${purpose}
+
+  log("Starting ${name} script");
+
+  // Example: read env, fetch data, validate with Zod, write to DB
+  // const dbUrl = requireEnv("MATHPILOT_DB_URL");
+
+  log("Done");
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function log(msg, meta) {
+  const entry = { timestamp: new Date().toISOString(), msg, ...meta };
+  process.stdout.write(JSON.stringify(entry) + "\\n");
+}
+
+main().catch((e) => {
+  process.stderr.write(JSON.stringify({ timestamp: new Date().toISOString(), error: String(e) }) + "\\n");
+  process.exit(1);
+});
+`;
+
+    const pkgContent = `{
+  "name": "mathpilot-${name}",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node run.js"
+  },
+  "dependencies": {
+    "zod": "3.23.8"
+  }
+}
+`;
+
+    const workflowContent = `# GitHub Actions workflow for: ${purpose}
+# Trigger manually from Actions tab → Run workflow
+# See architecture-principles.md §11 for operational script rules
+
+name: ${pascal}
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no writes)'
+        type: boolean
+        default: true${scheduleTrigger}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6h max — adjust per script
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/${name}/package.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: scripts/${name}
+
+      - name: Run ${name}
+        run: node run.js
+        working-directory: scripts/${name}
+        env:
+          MATHPILOT_DB_URL: \${{ secrets.MATHPILOT_DB_URL }}
+          # TODO: add other required secrets here
+          DRY_RUN: \${{ inputs.dry_run }}
+`;
+
+    return {
+        files: [
+            { path: scriptPath, content: scriptContent },
+            { path: pkgPath, content: pkgContent },
+            { path: workflowPath, content: workflowContent },
+        ],
+        summary: `Operational script \`${name}\` scaffolded in \`scripts/${name}/\` with GitHub Actions workflow.`,
+    };
+}
+
 // ─── String utilities ──────────────────────────────────────────────────────
 
 function toKebab(s) {
@@ -558,6 +696,7 @@ const GENERATORS = {
     "react-component": generateReactComponent,
     "migration": generateMigration,
     "test-factory": generateTestFactory,
+    "script": generateScript,
 };
 
 // ─── Extension entry point ─────────────────────────────────────────────────
@@ -565,7 +704,7 @@ const GENERATORS = {
 const session = await joinSession({
     hooks: {
         onSessionStart: async () => {
-            await session.log("MathPilot CodeGen loaded — 7 scaffolding templates available");
+            await session.log("MathPilot CodeGen loaded — 8 scaffolding templates available (incl. script)");
         },
     },
 
@@ -575,8 +714,8 @@ const session = await joinSession({
             description:
                 "Generate compliant boilerplate code following all MathPilot project standards. " +
                 "Supports: domain-entity, api-handler, application-use-case, infrastructure-adapter, " +
-                "react-component, migration, test-factory. Each template produces correctly layered " +
-                "code with proper types, error handling, tests, and naming conventions.",
+                "react-component, migration, test-factory, script. Each template produces correctly " +
+                "layered code with proper types, error handling, tests, and naming conventions.",
             parameters: {
                 type: "object",
                 properties: {
@@ -587,7 +726,8 @@ const session = await joinSession({
                             "'infrastructure-adapter' | 'react-component' | 'migration' | 'test-factory'",
                         enum: [
                             "domain-entity", "api-handler", "application-use-case",
-                            "infrastructure-adapter", "react-component", "migration", "test-factory",
+                            "infrastructure-adapter", "react-component", "migration",
+                            "test-factory", "script",
                         ],
                     },
                     name: {
@@ -629,6 +769,14 @@ const session = await joinSession({
                     entity: {
                         type: "string",
                         description: "Entity name for test-factory template",
+                    },
+                    purpose: {
+                        type: "string",
+                        description: "One-line description for script template",
+                    },
+                    schedule: {
+                        type: "string",
+                        description: "Optional cron expression for recurring script template (e.g., '0 2 * * 0')",
                     },
                     dry_run: {
                         type: "boolean",

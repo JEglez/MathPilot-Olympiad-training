@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "*.ts",
+    "../../functions/src/shared/latex.ts",
+    "../../functions/src/shared/competition.ts",
+    "../../functions/src/shared/dedup.ts",
+    "../../functions/src/domain/**/*.ts",
+    "../../functions/src/infrastructure/**/*.ts"
+  ],
+  "exclude": [
+    "../../functions/src/**/*.test.ts",
+    "../../functions/src/**/*.spec.ts"
+  ]
+}

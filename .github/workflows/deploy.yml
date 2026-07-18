@@ -1,0 +1,176 @@
+# GitHub Actions workflow — MathPilot infrastructure deployment
+# Deploys Bicep templates to Azure, then optionally runs DB migrations and seeds taxonomy.
+#
+# Required GitHub Secrets:
+#   AZURE_CREDENTIALS            — service principal JSON:
+#                                  az ad sp create-for-rbac --name "mathpilot-github" \
+#                                    --role contributor \
+#                                    --scopes /subscriptions/<sub-id> \
+#                                    --sdk-auth
+#                                  (subscription scope needed to register resource providers)
+#   AZURE_RESOURCE_GROUP         — target resource group (e.g. rg-omm)
+#   MATHPILOT_PG_ADMIN_PASSWORD  — strong password for the PostgreSQL admin user
+#
+# After first deploy the workflow prints the secrets to add for the Ingestion workflow:
+#   MATHPILOT_DB_URL, MATHPILOT_OPENAI_ENDPOINT, MATHPILOT_OPENAI_API_KEY,
+#   MATHPILOT_CLASSIFICATION_MODEL, MATHPILOT_EMBEDDING_MODEL
+#
+# Architecture reference: docs/governance/architecture-principles.md §7
+
+name: Deploy infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options: [dev, staging, prod]
+        default: dev
+      run_migrations:
+        description: 'Run DB migrations 001–004 after deploy (first run only)'
+        type: boolean
+        default: false
+      seed_taxonomy:
+        description: 'Seed taxonomy + competition data after migrations (first run only)'
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    name: Deploy (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Azure login ──────────────────────────────────────────────────────────
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── Register resource providers (idempotent, needed on first run) ──────────
+
+      - name: Register Azure resource providers
+        run: |
+          echo "Registering resource providers..."
+          az provider register --namespace Microsoft.DBforPostgreSQL --wait
+          az provider register --namespace Microsoft.CognitiveServices --wait
+          echo "✅ Providers registered"
+
+      # ── Bicep deployment ─────────────────────────────────────────────────────
+
+      - name: Deploy Bicep templates
+        id: bicep
+        run: |
+          echo "Deploying infra/main.bicep to ${{ secrets.AZURE_RESOURCE_GROUP }} (${{ inputs.environment }})..."
+
+          OUTPUT=$(az deployment group create \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters infra/params/${{ inputs.environment }}.bicepparam \
+            --parameters pgAdminPassword="${{ secrets.MATHPILOT_PG_ADMIN_PASSWORD }}" \
+            --query "properties.outputs" \
+            --output json)
+
+          echo "$OUTPUT"
+
+          # Extract outputs into step variables
+          PG_FQDN=$(echo "$OUTPUT"       | jq -r '.pgFqdn.value')
+          PG_DB=$(echo "$OUTPUT"         | jq -r '.pgDatabase.value')
+          PG_ADMIN=$(echo "$OUTPUT"      | jq -r '.pgAdminUser.value')
+          OPENAI_ENDPOINT=$(echo "$OUTPUT" | jq -r '.openaiEndpoint.value')
+          OPENAI_ACCOUNT=$(echo "$OUTPUT"  | jq -r '.openaiAccountName.value')
+          CLASS_MODEL=$(echo "$OUTPUT"   | jq -r '.classificationModel.value')
+          EMBED_MODEL=$(echo "$OUTPUT"   | jq -r '.embeddingModel.value')
+
+          # Build DB URL (password comes from secret, never from Bicep output)
+          DB_URL="postgresql://${PG_ADMIN}:${{ secrets.MATHPILOT_PG_ADMIN_PASSWORD }}@${PG_FQDN}:5432/${PG_DB}?sslmode=require"
+
+          # Retrieve OpenAI key (not in Bicep outputs — fetched via az CLI)
+          OPENAI_KEY=$(az cognitiveservices account keys list \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "$OPENAI_ACCOUNT" \
+            --query "key1" --output tsv)
+
+          # Mask secrets in logs
+          echo "::add-mask::${{ secrets.MATHPILOT_PG_ADMIN_PASSWORD }}"
+          echo "::add-mask::$OPENAI_KEY"
+          echo "::add-mask::$DB_URL"
+
+          # Expose as step outputs
+          echo "pg_fqdn=$PG_FQDN"             >> "$GITHUB_OUTPUT"
+          echo "pg_db=$PG_DB"                 >> "$GITHUB_OUTPUT"
+          echo "pg_admin=$PG_ADMIN"           >> "$GITHUB_OUTPUT"
+          echo "openai_endpoint=$OPENAI_ENDPOINT" >> "$GITHUB_OUTPUT"
+          echo "openai_account=$OPENAI_ACCOUNT"   >> "$GITHUB_OUTPUT"
+          echo "classification_model=$CLASS_MODEL" >> "$GITHUB_OUTPUT"
+          echo "embedding_model=$EMBED_MODEL"      >> "$GITHUB_OUTPUT"
+          echo "db_url=$DB_URL"               >> "$GITHUB_OUTPUT"
+          echo "openai_key=$OPENAI_KEY"       >> "$GITHUB_OUTPUT"
+
+          echo "✅ Bicep deployment complete"
+
+      # ── Optional: DB migrations (first run only) ─────────────────────────────
+
+      - name: Install PostgreSQL client
+        if: inputs.run_migrations || inputs.seed_taxonomy
+        run: sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Run DB migrations (001–004)
+        if: inputs.run_migrations
+        env:
+          MATHPILOT_DB_URL: ${{ steps.bicep.outputs.db_url }}
+        run: |
+          echo "Running migrations..."
+          for f in \
+            db/migrations/001_create_taxonomy.sql \
+            db/migrations/002_create_problems.sql \
+            db/migrations/003_create_join_tables.sql \
+            db/migrations/004_create_import_tables.sql; do
+            echo "  → $f"
+            psql "$MATHPILOT_DB_URL" -f "$f" -v ON_ERROR_STOP=1
+          done
+          echo "✅ Migrations 001–004 complete"
+          echo "   (005_create_search_indexes.sql runs after bulk import — see Ingestion workflow)"
+
+      # ── Optional: taxonomy + competition seed data ───────────────────────────
+
+      - name: Seed taxonomy and competition data
+        if: inputs.seed_taxonomy
+        env:
+          MATHPILOT_DB_URL: ${{ steps.bicep.outputs.db_url }}
+        run: |
+          echo "Loading seed data..."
+          for f in topics subtopics techniques competitions; do
+            echo "  → db/seed/$f.sql"
+            psql "$MATHPILOT_DB_URL" -f "db/seed/$f.sql" -v ON_ERROR_STOP=1
+          done
+          echo "✅ Taxonomy and competition seed data loaded"
+
+      # ── Print secrets for GitHub configuration ───────────────────────────────
+
+      - name: Print GitHub Secrets to configure
+        run: |
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo " ✅ Infrastructure ready — add these to GitHub Secrets:"
+          echo " GitHub → Settings → Secrets and variables → Actions"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "  MATHPILOT_DB_URL               (retrieved from Bicep + password)"
+          echo "  MATHPILOT_OPENAI_ENDPOINT      = ${{ steps.bicep.outputs.openai_endpoint }}"
+          echo "  MATHPILOT_OPENAI_API_KEY       (retrieved from Azure — see logs)"
+          echo "  MATHPILOT_CLASSIFICATION_MODEL = ${{ steps.bicep.outputs.classification_model }}"
+          echo "  MATHPILOT_EMBEDDING_MODEL      = ${{ steps.bicep.outputs.embedding_model }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo " Next steps:"
+          echo "   1. Add the 5 secrets above to GitHub"
+          echo "   2. Trigger the Ingestion workflow:"
+          echo "        dry_run = true   ← validate parsing first"
+          echo "   3. If dry run looks good, re-run with dry_run = false"
+          echo "════════════════════════════════════════════════════════════════"

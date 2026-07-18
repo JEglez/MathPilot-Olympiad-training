@@ -15,8 +15,15 @@
 │           Domain Layer              │  Entities, value objects, domain logic
 ├─────────────────────────────────────┤
 │        Infrastructure Layer         │  Database, AI services, blob storage
+├─────────────────────────────────────┤
+│          Shared Utilities           │  Pure functions, no layer affinity
 └─────────────────────────────────────┘
 ```
+
+**Shared Utilities** (`functions/src/shared/`) are pure functions with no
+external dependencies and no layer affinity. Any layer — and operational
+scripts — may import from here. Examples: LaTeX normalisation, dedup hashing,
+competition name resolution.
 
 ### Rules
 
@@ -25,6 +32,11 @@
   clients, no framework code in domain entities.
 - **Application layer orchestrates.** It calls domain logic and infrastructure
   adapters but contains no business rules itself.
+- **`Result<T,E>` at domain boundaries only.** Domain functions return
+  `Result<T,E>`. Application and infrastructure layers may `throw` for
+  unexpected errors — do not force `Result<T,E>` everywhere.
+- **Shared utilities have zero framework/DB/HTTP imports.** They must remain
+  importable without any runtime setup.
 
 ## 2. Domain-Driven Design
 
@@ -119,7 +131,53 @@
 | Bundle size (initial) | < 200KB gzipped |
 | AI classification latency | < 30s per problem (async, non-blocking) |
 
-## 10. Evolutionary Architecture
+## 11. Operational Scripts & One-Time Tools
+
+Not all code in this repo is application code. Some tasks are **operational** —
+they run once (or sporadically), are not invoked by users, and have no API surface.
+
+### What counts as a script
+
+- Data import / ingestion pipelines
+- Database back-fills and one-time migrations
+- Taxonomy seed and update tools
+- Benchmark / accuracy evaluation runs
+- Dataset preparation and normalisation
+
+These live in **`scripts/<purpose>/`** (e.g., `scripts/ingestion/`), NOT in
+`functions/src/` or `apps/`.
+
+### Different rules apply to scripts
+
+| Concern | Application code | Operational scripts |
+|---------|-----------------|---------------------|
+| Architecture | Layered DDD | **Flat — no layers** |
+| Error handling | `Result<T,E>` | `throw` / `process.exit(1)` is fine |
+| Branded IDs | Required | Not required |
+| Type safety | Strict, no `any` | Strict at **external boundaries only** (Zod for API/DB input) |
+| Tests | Co-located unit tests | Integration test or manual verification |
+| Logging | Structured logger | `console.log` / structured JSON to stdout |
+
+### Rules that still apply
+
+- **No secrets in code.** Read from environment variables.
+- **Idempotency.** Re-running a script must not corrupt data (use `ON CONFLICT DO NOTHING`, dedup checks).
+- **Exit code 1 on failure.** Scripts signal failure so CI can detect it.
+- **Document the run command** in a comment at the top of the file.
+
+### Execution model
+
+Operational scripts run via **GitHub Actions `workflow_dispatch`** (for
+anything taking > 5 minutes or needing cloud credentials) or locally for
+quick tasks. They are **not deployed** as Azure Functions or any always-on service.
+
+### Shared code
+
+Scripts may import from `functions/src/shared/` — pure utility functions
+(LaTeX normalisation, dedup hash, competition resolver) that have zero
+framework/DB/HTTP dependencies. They must NOT import from `functions/src/domain/`,
+`functions/src/infrastructure/`, or `functions/src/application/`.
+
 
 - **Fitness functions** (automated checks) enforce architectural rules in CI.
 - **ADRs** document every significant architectural choice in `docs/adr/`.
