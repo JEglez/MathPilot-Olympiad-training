@@ -36,7 +36,7 @@ jobs:
         working-directory: scripts/ingestion
 
       - name: Run ingestion
-        run: node run.js
+        run: npx tsx run.ts
         working-directory: scripts/ingestion
         env:
           MATHPILOT_DB_URL:               ${{ secrets.MATHPILOT_DB_URL }}

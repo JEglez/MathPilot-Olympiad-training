@@ -5,10 +5,14 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "start": "node run.js"
+    "start": "tsx run.ts"
   },
   "dependencies": {
-    "pg": "8.11.3",
     "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
   }
 }

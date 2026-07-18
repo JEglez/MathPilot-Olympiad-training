@@ -46,12 +46,12 @@ entry_barrier: transparent (approach visible immediately), camouflaged (needs in
 export function buildUserMessage(opts: {
   statement: string;
   sourceSubject?: string | null;
-  sourceDifficulty?: number | null;
+  sourceDifficulty?: string | null;
   sourceCompetition?: string | null;
 }): string {
   const hints = [
     opts.sourceSubject ? `Source subject: ${opts.sourceSubject}` : null,
-    opts.sourceDifficulty ? `Source difficulty: ${opts.sourceDifficulty}/10` : null,
+    opts.sourceDifficulty ? `Source difficulty: ${opts.sourceDifficulty}` : null,
     opts.sourceCompetition ? `Source competition: ${opts.sourceCompetition}` : null,
   ].filter(Boolean).join("\n");
 

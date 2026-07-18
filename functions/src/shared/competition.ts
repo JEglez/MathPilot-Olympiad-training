@@ -9,33 +9,34 @@ export interface ResolvedCompetition {
 /** Canonical lookup table — covers all 4 source datasets */
 export const COMPETITION_MAP: Record<string, ResolvedCompetition> = {
   // Omni-MATH source codes
-  imo:                       { abbreviation: "IMO",     level: "international" },
-  imo_shortlist:             { abbreviation: "ISL",     level: "international" },
-  imol:                      { abbreviation: "IMO",     level: "international" },
-  usa_team_selection_test:   { abbreviation: "USATST",  level: "national" },
-  china_team_selection_test: { abbreviation: "CNTST",   level: "national" },
-  putnam:                    { abbreviation: "PUTNAM",  level: "national" },
-  usamo:                     { abbreviation: "USAMO",   level: "national" },
-  usajmo:                    { abbreviation: "USAJMO",  level: "national" },
-  china_national_olympiad:   { abbreviation: "CNMO",    level: "national" },
-  apmo:                      { abbreviation: "APMO",    level: "international" },
-  balkan_mo:                 { abbreviation: "BMO",     level: "international" },
-  baltic_way:                { abbreviation: "BWAY",    level: "international" },
-  egmo:                      { abbreviation: "EGMO",    level: "international" },
-  aime:                      { abbreviation: "AIME",    level: "state" },
-  amc_8:                     { abbreviation: "AMC8",    level: "local" },
-  amc_10:                    { abbreviation: "AMC10",   level: "local" },
-  amc_12:                    { abbreviation: "AMC12",   level: "local" },
-  hmmt:                      { abbreviation: "HMMT",    level: "national" },
-  omm:                       { abbreviation: "OMM",     level: "national" },
-  omm_regional:              { abbreviation: "OMM-REG", level: "state" },
+  imo:                               { abbreviation: "IMO",     level: "international" },
+  imo_shortlist:                     { abbreviation: "ISL",     level: "international" },
+  imol:                              { abbreviation: "IMO",     level: "international" },
+  international_mathematical_olympiad: { abbreviation: "IMO",   level: "international" },
+  usa_team_selection_test:           { abbreviation: "USATST",  level: "national" },
+  china_team_selection_test:         { abbreviation: "CNTST",   level: "national" },
+  putnam:                            { abbreviation: "PUTNAM",  level: "national" },
+  usamo:                             { abbreviation: "USAMO",   level: "national" },
+  usajmo:                            { abbreviation: "USAJMO",  level: "national" },
+  china_national_olympiad:           { abbreviation: "CNMO",    level: "national" },
+  apmo:                              { abbreviation: "APMO",    level: "international" },
+  balkan_mo:                         { abbreviation: "BALKAN",  level: "international" },
+  baltic_way:                        { abbreviation: "BWAY",    level: "international" },
+  egmo:                              { abbreviation: "EGMO",    level: "international" },
+  aime:                              { abbreviation: "AIME",    level: "national" },
+  amc_8:                             { abbreviation: "AMC8",    level: "local" },
+  amc_10:                            { abbreviation: "AMC10",   level: "local" },
+  amc_12:                            { abbreviation: "AMC12",   level: "local" },
+  hmmt:                              { abbreviation: "HMMT",    level: "national" },
+  omm:                               { abbreviation: "OMM",     level: "national" },
+  omm_regional:                      { abbreviation: "OMEGAL",  level: "state" },
 
   // OlympiadBench filename patterns
-  comp:                      { abbreviation: "COMP",    level: "national" },
+  comp:                              { abbreviation: "COMP",    level: "national" },
 
   // NuminaMath source categories
-  olympiads:                 { abbreviation: "OLY",     level: "national" },
-  amc_aime:                  { abbreviation: "AMC",     level: "local" },
+  olympiads:                         { abbreviation: "OLY",     level: "national" },
+  amc_aime:                          { abbreviation: "AMC",     level: "local" },
 };
 
 /** Normalise source string to a lookup key */

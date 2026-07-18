@@ -2,14 +2,23 @@
 // Per 03-dataset-import-search.md §5.4
 // search_tsv auto-populates (GENERATED ALWAYS column — no explicit insert needed)
 
-import type { Pool } from "pg";
+import { Pool } from "pg";
 import type { CanonicalProblem, StorageError, ImportOutcome } from "../../domain/ingestion/types";
 import type { Result } from "../../domain/shared/result";
 import { ok, err } from "../../domain/shared/result";
-import { asDedupHash } from "../../domain/shared/branded";
 
 export class PostgresProblemRepository {
   constructor(private readonly pool: Pool) {}
+
+  /** Factory — creates a repository with its own connection pool from a connection string */
+  static create(dbUrl: string): PostgresProblemRepository {
+    return new PostgresProblemRepository(new Pool({ connectionString: dbUrl }));
+  }
+
+  /** Close the underlying pool (call when the process is done) */
+  async end(): Promise<void> {
+    await this.pool.end();
+  }
 
   /** Check if a problem already exists by dedup hash */
   async existsByDedupHash(dedupHash: string): Promise<boolean> {
