@@ -30,11 +30,11 @@ resource openaiAccount 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
 
 // ── Model deployments ─────────────────────────────────────────────────────────
 
-// gpt-4o-mini: used for taxonomy classification via Batch API
-// GlobalStandard SKU at 30k TPM (≈ $3 one-time import cost)
+// gpt-5-mini: GA classification model (gpt-4o-mini and gpt-4.1-mini are deprecated for new deployments)
+// GlobalStandard SKU at 30k TPM
 resource classificationDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   parent: openaiAccount
-  name: 'gpt-4o-mini'
+  name: 'gpt-5-mini'
   sku: {
     name: 'GlobalStandard'
     capacity: 30
@@ -42,8 +42,8 @@ resource classificationDeployment 'Microsoft.CognitiveServices/accounts/deployme
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4o-mini'
-      version: '2024-07-18'
+      name: 'gpt-5-mini'
+      version: '2025-08-07'
     }
     raiPolicyName: 'Microsoft.DefaultV2'
   }
