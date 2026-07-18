@@ -11,8 +11,10 @@ export interface EmbeddingGeneratorConfig {
 
 export class OpenAIEmbedder {
   private readonly config: EmbeddingGeneratorConfig;
-  private static readonly BATCH_SIZE = 2_048; // Azure OpenAI max inputs per request
+  // Conservative batch: ~100 inputs keeps each request well under 300K TPM
+  private static readonly BATCH_SIZE = 100;
   private static readonly DIMENSIONS = 1536;
+  private static readonly MAX_RETRIES = 5;
 
   // Circuit breaker
   private consecutiveFailures = 0;
@@ -49,37 +51,55 @@ export class OpenAIEmbedder {
       throw new Error("Embedding circuit breaker is open");
     }
 
-    const response = await fetch(
-      `${this.config.endpoint}/openai/deployments/${this.config.modelId}/embeddings?api-version=2024-02-01`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": this.config.apiKey,
+    let delayMs = 5_000;
+    for (let attempt = 0; attempt <= OpenAIEmbedder.MAX_RETRIES; attempt++) {
+      const response = await fetch(
+        `${this.config.endpoint}/openai/deployments/${this.config.modelId}/embeddings?api-version=2024-02-01`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "api-key": this.config.apiKey,
+          },
+          body: JSON.stringify({
+            input: inputs,
+            model: this.config.modelId,
+            dimensions: OpenAIEmbedder.DIMENSIONS,
+          }),
         },
-        body: JSON.stringify({
-          input: inputs,
-          model: this.config.modelId,
-          dimensions: OpenAIEmbedder.DIMENSIONS,
-        }),
-      },
-    );
+      );
 
-    if (!response.ok) {
-      this.recordFailure();
-      throw new Error(`Embedding API error: ${response.status}`);
+      // Retry on 429 (rate limit) and 5xx (transient errors) with exponential backoff
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        if (attempt === OpenAIEmbedder.MAX_RETRIES) {
+          this.recordFailure();
+          throw new Error(`Embedding API error: ${response.status}`);
+        }
+        const retryAfter = response.headers.get("Retry-After");
+        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : delayMs;
+        await new Promise(r => setTimeout(r, waitMs));
+        delayMs = Math.min(delayMs * 2, 60_000);
+        continue;
+      }
+
+      if (!response.ok) {
+        this.recordFailure();
+        throw new Error(`Embedding API error: ${response.status}`);
+      }
+
+      const data = await response.json() as {
+        data: { embedding: number[]; index: number }[];
+      };
+
+      this.recordSuccess();
+
+      // Sort by index to preserve input order
+      return data.data
+        .sort((a, b) => a.index - b.index)
+        .map(d => d.embedding);
     }
 
-    const data = await response.json() as {
-      data: { embedding: number[]; index: number }[];
-    };
-
-    this.recordSuccess();
-
-    // Sort by index to preserve input order
-    return data.data
-      .sort((a, b) => a.index - b.index)
-      .map(d => d.embedding);
+    throw new Error("callEmbeddingAPI: unreachable");
   }
 
   private isCircuitOpen(): boolean {
