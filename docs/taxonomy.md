@@ -60,14 +60,47 @@ Each domain has 5–10 subtopics. Below is the full taxonomy.
 
 ### ALG — Algebraic Structures & Manipulations
 
+> **Design note:** The subtopics below are ordered from foundational to advanced,
+> informed by the Mexican Math Olympiad (OMM) state/regional curriculum. A student
+> entering from a state-level competition should find their starting point in the
+> first 3–4 subtopics. The old taxonomy jumped straight to Vieta's and functional
+> equations — that's a cliff, not a ramp.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
+These subtopics cover what a student learns in their first 1–2 years of olympiad
+training. They are **not** trivial — olympiad problems at this level already
+require creative thinking, but the algebraic tools are elementary.
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `ALG-POL` | Polynomials & Roots | Vieta's, root-finding, irreducibility, minimal polynomials |
-| `ALG-INQ` | Inequalities | AM-GM, Cauchy-Schwarz, Schur, SOS, Jensen, smoothing/convexity |
-| `ALG-FEQ` | Functional Equations | Cauchy-type, injectivity/surjectivity, substitution strategies |
-| `ALG-SEQ` | Sequences & Recurrences | Linear recurrences, characteristic roots, bounding, periodicity |
-| `ALG-SYS` | Systems of Equations | Symmetric systems, substitution, resultants |
-| `ALG-SET` | Algebraic Structures | Groups, rings, fields (as they appear in olympiads, not abstract algebra courses) |
+| `ALG-MAN` | Algebraic Manipulation & Simplification | Expanding, factoring, simplifying expressions; productos notables (special products); difference of squares/cubes; Sophie Germain identity; rationalisation; algebraic fractions |
+| `ALG-EQN` | Equations & Linear Systems | Solving linear and quadratic equations; quadratic formula and discriminant; systems of 2–3 linear equations; equations with parameters; word-problem formulation (age, rate, mixture problems) |
+| `ALG-BAS-INQ` | Elementary Inequalities & Ordering | Solving linear/quadratic inequalities; sign analysis; absolute value inequalities; comparison by subtraction; trivial bounds; "when does equality hold?" reasoning |
+| `ALG-PAT` | Patterns, Telescoping & Clever Arithmetic | Recognising and exploiting algebraic patterns; telescoping sums and products; grouping tricks; digit-sum arguments; arithmetic short-cuts used in competition |
+| `ALG-PROG` | Arithmetic & Geometric Progressions | Explicit and recursive formulas; finite sums; problems involving AP/GP properties; sum of squares/cubes formulas; sigma notation |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+The student has solid manipulation skills and begins learning the classic
+olympiad inequality and polynomial toolkit.
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `ALG-POL` | Polynomials & Roots | Factor/remainder theorem; Vieta's formulas; root bounding; irreducibility tests; minimal polynomials; symmetric polynomials; Newton's identities |
+| `ALG-INQ` | Classical Inequalities | AM-GM, Cauchy-Schwarz / Engel form, rearrangement, Chebyshev sum, power-mean; choosing the right inequality; equality conditions |
+| `ALG-SYS` | Nonlinear & Symmetric Systems | Symmetric substitution (s, p); cyclic systems; substitution strategies; resultants for eliminating variables |
+| `ALG-SEQ` | Sequences & Recurrences | Linear recurrences and characteristic equations; bounding sequences; periodicity detection; nested radicals; convergence arguments |
+| `ALG-IND` | Mathematical Induction (Algebraic) | Weak and strong induction applied to algebraic identities, inequalities, and divisibility; inductive constructions |
+| `ALG-SUM` | Summation & Manipulation of Sums | Sigma notation; sum splitting, reindexing, double sums; Abel summation; bounding sums; competition-style sum evaluation |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `ALG-FEQ` | Functional Equations | Cauchy-type equations; injectivity/surjectivity deductions; substitution strategies; fixed points; regularity conditions |
+| `ALG-ADV-INQ` | Advanced Inequalities | Schur, SOS decomposition, Jensen & convexity, smoothing/mixing variables, tangent-line trick, Muirhead, uvw/pqr method |
+| `ALG-SET` | Algebraic Structures | Groups, rings, fields as they appear in olympiads; order of elements; algebraic number theory basics; polynomial rings mod p |
 
 ### NT — Number Theory & Arithmetic
 
@@ -141,19 +174,57 @@ Techniques are the **atomic skills** a student learns. Each technique belongs to
 a primary subtopic but may appear across many. Below is a representative sample
 (not exhaustive).
 
-### Inequality Techniques (ALG-INQ)
+### Algebraic Techniques — Foundational Tier (ALG-MAN, ALG-EQN, ALG-BAS-INQ, ALG-PAT, ALG-PROG)
 
-| Code | Technique | Cognitive Load |
-|------|-----------|----------------|
-| `T-AMGM` | AM-GM and weighted AM-GM | foundational |
-| `T-CS` | Cauchy-Schwarz (direct & Engel/Titu form) | foundational |
-| `T-SCHUR` | Schur's Inequality | intermediate |
-| `T-SOS` | Sum of Squares decomposition | advanced |
-| `T-JENSEN` | Jensen's Inequality & convexity | intermediate |
-| `T-SMOOTH` | Smoothing / mixing variables | advanced |
-| `T-TANGENT` | Tangent line trick | intermediate |
-| `T-MUIRHEAD` | Muirhead's Inequality & majorisation | advanced |
-| `T-UVWXYZ` | uvw / pqr substitution method | elite |
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-SPECPROD` | Special Products & Factorisation Patterns | foundational | ALG-MAN |
+| `T-DIFFSQ` | Difference of Squares / Cubes / Sophie Germain | foundational | ALG-MAN |
+| `T-ALGFRAC` | Algebraic Fractions & Rationalisation | foundational | ALG-MAN |
+| `T-SUBST` | Strategic Substitution (let u = …) | foundational | ALG-MAN |
+| `T-QUADFORM` | Quadratic Formula, Discriminant & Sign Analysis | foundational | ALG-EQN |
+| `T-PARAMSOLVE` | Equations with Parameters | foundational | ALG-EQN |
+| `T-WORDMODEL` | Algebraic Modelling of Word Problems | foundational | ALG-EQN |
+| `T-SIGNINEQ` | Sign Analysis & Comparison by Subtraction | foundational | ALG-BAS-INQ |
+| `T-ABSVAL` | Absolute Value Reasoning | foundational | ALG-BAS-INQ |
+| `T-TRIVBOUND` | Trivial Bounds (squares ≥ 0, |x| ≥ 0) | foundational | ALG-BAS-INQ |
+| `T-TELESCOPE` | Telescoping Sums & Products | foundational | ALG-PAT |
+| `T-GROUP` | Grouping & Pairing Tricks | foundational | ALG-PAT |
+| `T-APGP` | AP / GP Formulas & Properties | foundational | ALG-PROG |
+| `T-SIGMA` | Sigma Notation & Finite Sum Formulas | foundational | ALG-PROG |
+
+### Algebraic Techniques — Intermediate Tier (ALG-POL, ALG-INQ, ALG-SYS, ALG-SEQ, ALG-IND, ALG-SUM)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-VIETA` | Vieta's Formulas | intermediate | ALG-POL |
+| `T-FACREM` | Factor & Remainder Theorem | intermediate | ALG-POL |
+| `T-SYMPOLY` | Symmetric Polynomials & Newton's Identities | intermediate | ALG-POL |
+| `T-ROOTBOUND` | Root Bounding & Irreducibility | intermediate | ALG-POL |
+| `T-AMGM` | AM-GM and Weighted AM-GM | intermediate | ALG-INQ |
+| `T-CS` | Cauchy-Schwarz (direct & Engel/Titu form) | intermediate | ALG-INQ |
+| `T-REARRANGE` | Rearrangement Inequality | intermediate | ALG-INQ |
+| `T-CHEBY` | Chebyshev Sum Inequality | intermediate | ALG-INQ |
+| `T-POWERMEAN` | Power Mean Inequality | intermediate | ALG-INQ |
+| `T-SYMSUB` | Symmetric Substitution (s, p, q) | intermediate | ALG-SYS |
+| `T-CHARACT` | Characteristic Equation for Recurrences | intermediate | ALG-SEQ |
+| `T-INDUCTION` | Mathematical Induction (weak & strong) | intermediate | ALG-IND |
+| `T-ABEL` | Abel Summation & Summation by Parts | intermediate | ALG-SUM |
+
+### Algebraic Techniques — Advanced Tier (ALG-FEQ, ALG-ADV-INQ, ALG-SET)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-CAUCHY-FEQ` | Cauchy-type Functional Equations | advanced | ALG-FEQ |
+| `T-INJSURJ` | Injectivity / Surjectivity Deduction | advanced | ALG-FEQ |
+| `T-FIXEDPT` | Fixed-Point & Periodicity in FEs | advanced | ALG-FEQ |
+| `T-SCHUR` | Schur's Inequality | advanced | ALG-ADV-INQ |
+| `T-SOS` | Sum of Squares Decomposition | advanced | ALG-ADV-INQ |
+| `T-JENSEN` | Jensen's Inequality & Convexity | advanced | ALG-ADV-INQ |
+| `T-SMOOTH` | Smoothing / Mixing Variables | advanced | ALG-ADV-INQ |
+| `T-TANGENT` | Tangent Line Trick | advanced | ALG-ADV-INQ |
+| `T-MUIRHEAD` | Muirhead's Inequality & Majorisation | advanced | ALG-ADV-INQ |
+| `T-UVWXYZ` | uvw / pqr Substitution Method | elite | ALG-ADV-INQ |
 
 ### Number Theory Techniques (NT-*)
 
@@ -598,12 +669,26 @@ Week 4 check-in:
 MathPilot Taxonomy
 │
 ├── ALG — Algebraic Structures & Manipulations
-│   ├── ALG-POL  Polynomials & Roots (7 techniques)
-│   ├── ALG-INQ  Inequalities (9 techniques)
-│   ├── ALG-FEQ  Functional Equations (6 techniques)
-│   ├── ALG-SEQ  Sequences & Recurrences (5 techniques)
-│   ├── ALG-SYS  Systems of Equations (4 techniques)
-│   └── ALG-SET  Algebraic Structures (3 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── ALG-MAN      Manipulation & Simplification (4 techniques)
+│   │   ├── ALG-EQN      Equations & Linear Systems (3 techniques)
+│   │   ├── ALG-BAS-INQ  Elementary Inequalities (3 techniques)
+│   │   ├── ALG-PAT      Patterns & Telescoping (2 techniques)
+│   │   └── ALG-PROG     Progressions (2 techniques)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── ALG-POL  Polynomials & Roots (4 techniques)
+│   │   ├── ALG-INQ  Classical Inequalities (5 techniques)
+│   │   ├── ALG-SYS  Nonlinear & Symmetric Systems (1 technique)
+│   │   ├── ALG-SEQ  Sequences & Recurrences (1 technique)
+│   │   ├── ALG-IND  Mathematical Induction (1 technique)
+│   │   └── ALG-SUM  Summation Techniques (1 technique)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── ALG-FEQ      Functional Equations (3 techniques)
+│       ├── ALG-ADV-INQ  Advanced Inequalities (7 techniques)
+│       └── ALG-SET      Algebraic Structures (—)
 │
 ├── NT — Number Theory & Arithmetic
 │   ├── NT-DIV   Divisibility & GCD (4 techniques)
@@ -651,5 +736,5 @@ MathPilot Taxonomy
     ├── GAME-ALG  Algorithmic Processes (3 techniques)
     └── GAME-CON  Constructions & Examples (2 techniques)
 
-Total: 8 domains, 50+ subtopics, 120+ techniques, 400+ learning objectives
+Total: 8 domains, 14 ALG subtopics (3 tiers) + 40+ other subtopics, 150+ techniques, 500+ learning objectives
 ```
