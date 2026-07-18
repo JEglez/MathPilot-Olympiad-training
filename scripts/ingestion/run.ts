@@ -110,7 +110,7 @@ function parseOmniMath(raw: unknown): CanonicalProblem {
     answer: r.answer ?? null, solutions: solution(r.solution), language: "en",
     sourceCompetition: c?.abbreviation ?? null,
     sourceDomainPath: r.domain ? r.domain.join(" -> ") : null,
-    sourceSubject: r.domain?.join(" ").toLowerCase() || null,
+    sourceSubject: r.domain ? r.domain.join(" -> ") : null,  // full path as classifier hint (§4.4)
     sourceDifficulty: r.difficulty ?? null,
     sourceYear: null, sourceRound: null,
     topics: [], subtopics: [], techniques: [],
@@ -231,40 +231,49 @@ async function main(): Promise<void> {
 
     const runId = DRY_RUN ? "dry-run" : await repository.createImportRun(source);
 
-    const BATCH = 100;
-    for (let i = 0; i < problems.length; i += BATCH) {
-      const batch = problems.slice(i, i + BATCH);
-
-      const toProcess: CanonicalProblem[] = [];
-      for (const p of batch) {
-        if (await repository.existsByDedupHash(p.dedupHash)) { stats.skipped++; continue; }
+    // Filter duplicates up-front
+    const toProcess: CanonicalProblem[] = [];
+    for (const p of problems) {
+      if (DRY_RUN || !await repository.existsByDedupHash(p.dedupHash)) {
         toProcess.push(p);
+      } else {
+        stats.skipped++;
       }
-      if (!toProcess.length) continue;
+    }
+    log("source:deduped", { source, toProcess: toProcess.length, skipped: stats.skipped });
 
-      if (DRY_RUN) {
-        log("dry-run:would-import", { source, batch: i, count: toProcess.length });
-        stats.imported += toProcess.length;
-        continue;
-      }
-
+    if (DRY_RUN) {
+      log("dry-run:would-import", { source, count: toProcess.length });
+      stats.imported += toProcess.length;
+    } else if (toProcess.length > 0) {
+      // Embed all at once — embedder handles its own internal batching (2048/req)
+      log("source:embedding", { source, count: toProcess.length });
       let embeddings: number[][];
       try {
         embeddings = await embedder.embedBatch(toProcess.map(p => p.statementPlain));
       } catch (e) {
-        log("embed:error", { source, batch: i, error: String(e) });
+        log("embed:error", { source, error: String(e) });
         stats.failed += toProcess.length;
+        await repository.completeImportRun(runId, "failed");
         continue;
       }
 
-      for (let j = 0; j < toProcess.length; j++) {
-        const base = toProcess[j];
-        const embedding = embeddings[j];
-        if (!base || !embedding) { stats.failed++; continue; }
+      // Classify all via Batch API (single job, polls until done — 03-dataset-import-search.md §5.3)
+      // Using Batch API reduces classification cost by ~50% vs per-request calls.
+      log("source:classifying", { source, count: toProcess.length });
+      const classResults = await classifier.classifyBatch(toProcess);
 
-        const classResult = await classifier.classifySingle(base);
-        if (!classResult.ok) log("classify:warn", { id: base.externalId, error: classResult.error.kind });
-        const problem = classResult.ok ? applyClassification(base, classResult.value) : base;
+      // Store each problem with its embedding and classification
+      for (let i = 0; i < toProcess.length; i++) {
+        const base = toProcess[i]!;
+        const embedding = embeddings[i];
+        if (!embedding) { stats.failed++; continue; }
+
+        const classResult = classResults.get(base.externalId);
+        if (classResult && !classResult.ok) {
+          log("classify:warn", { id: base.externalId, error: classResult.error.kind });
+        }
+        const problem = classResult?.ok ? applyClassification(base, classResult.value) : base;
 
         const result = await repository.insertProblem(problem, embedding, runId);
         if (!result.ok) {
@@ -273,9 +282,11 @@ async function main(): Promise<void> {
         } else {
           stats.imported++;
         }
-      }
 
-      log("source:progress", { source, processed: Math.min(i + BATCH, problems.length), total: problems.length });
+        if ((i + 1) % 100 === 0) {
+          log("source:progress", { source, processed: i + 1, total: toProcess.length });
+        }
+      }
     }
 
     if (!DRY_RUN) await repository.completeImportRun(runId, stats.failed > 0 ? "failed" : "completed");

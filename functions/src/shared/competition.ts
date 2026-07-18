@@ -2,7 +2,7 @@
 // Per 03-dataset-import-search.md §4.3
 
 export interface ResolvedCompetition {
-  readonly abbreviation: string;
+  readonly abbreviation: string | null;   // null when source is a category, not a named competition
   readonly level: "local" | "state" | "national" | "international";
 }
 
@@ -20,7 +20,7 @@ export const COMPETITION_MAP: Record<string, ResolvedCompetition> = {
   usajmo:                            { abbreviation: "USAJMO",  level: "national" },
   china_national_olympiad:           { abbreviation: "CNMO",    level: "national" },
   apmo:                              { abbreviation: "APMO",    level: "international" },
-  balkan_mo:                         { abbreviation: "BALKAN",  level: "international" },
+  balkan_mo:                         { abbreviation: "BMO",     level: "international" },
   baltic_way:                        { abbreviation: "BWAY",    level: "international" },
   egmo:                              { abbreviation: "EGMO",    level: "international" },
   aime:                              { abbreviation: "AIME",    level: "national" },
@@ -34,8 +34,8 @@ export const COMPETITION_MAP: Record<string, ResolvedCompetition> = {
   // OlympiadBench filename patterns
   comp:                              { abbreviation: "COMP",    level: "national" },
 
-  // NuminaMath source categories
-  olympiads:                         { abbreviation: "OLY",     level: "national" },
+  // NuminaMath source categories — "olympiads" is a category, not a specific competition
+  olympiads:                         { abbreviation: null,      level: "national" },
   amc_aime:                          { abbreviation: "AMC",     level: "local" },
 };
 
