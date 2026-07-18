@@ -245,6 +245,9 @@ export async function streamChat(
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
+
+      // [DONE] is a raw sentinel string — handle before JSON.parse
+      // Citations may still follow on subsequent lines after [DONE]
       if (data === "[DONE]") continue;
 
       let parsed: unknown;
@@ -254,17 +257,14 @@ export async function streamChat(
         continue;
       }
 
-      if (
-        parsed !== null &&
-        typeof parsed === "object" &&
-        "type" in parsed
-      ) {
-        const event = parsed as { type: string; delta?: string; citations?: CitedProblem[] };
-        if (event.type === "delta" && typeof event.delta === "string") {
-          onChunk(event.delta);
-        } else if (event.type === "citations" && Array.isArray(event.citations)) {
-          onCitations(event.citations);
-        }
+      if (parsed === null || typeof parsed !== "object") continue;
+
+      // Phase 4 SSE format: {"delta":"..."} for chunks, {"citations":[...]} for citations
+      const event = parsed as Record<string, unknown>;
+      if (typeof event["delta"] === "string") {
+        onChunk(event["delta"]);
+      } else if (Array.isArray(event["citations"])) {
+        onCitations(event["citations"] as CitedProblem[]);
       }
     }
   }
