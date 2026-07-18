@@ -7,7 +7,7 @@
     "build": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "import": "tsx src/import/run-import.ts"
+    "import": "tsx ../../scripts/ingestion/run.ts"
   },
   "dependencies": {
     "pg": "8.11.3",
