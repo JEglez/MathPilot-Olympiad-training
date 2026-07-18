@@ -399,9 +399,14 @@ Respond with this exact JSON schema:
 
 **Cost optimisation:**
 - Use **Azure OpenAI Batch API** (50% cost reduction, 24-hour turnaround)
-- Send in batches of 100 problems per request
-- ~12,000 problems × ~800 tokens/problem ≈ 10M tokens ≈ **$1.50** with Batch API
-- Include source hints to improve accuracy and reduce token usage
+- Each problem is one request in the batch JSONL file (up to 100k requests per batch)
+- Per problem: ~2,500 input tokens (2,000 condensed taxonomy + ~300 statement + ~200 hints) + ~200 output tokens
+- 12,000 problems via Batch API:
+  - Input:  30M tokens × $0.075/1M = $2.25
+  - Output: 2.4M tokens × $0.30/1M = $0.72
+  - **Total classification: ~$3.00**
+- The condensed taxonomy system prompt is cached within each batch — no per-problem re-tokenisation overhead
+- Include source hints (subject, difficulty, competition) to improve accuracy and constrain output
 
 **Taxonomy reference compression:** The full taxonomy is ~50,000 tokens — too
 large for the context window. Instead, provide a condensed reference:
@@ -509,9 +514,28 @@ await searchClient.uploadDocuments([searchDoc]);
 
 ## 6. Import Tracking Schema
 
-New table in PostgreSQL (MVP-only, not part of core domain model):
+New tables in PostgreSQL (MVP-only, not part of core domain model):
+
+> **Note:** `import_records` and `import_runs` (below) track **dataset imports**
+> (this pipeline). The `ingestion_jobs` table in `02-mvp-architecture.md` §3.4
+> tracks **PDF uploads** (Phase 2). They are separate tracking mechanisms for
+> separate ingestion paths.
 
 ```sql
+CREATE TABLE import_runs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_dataset  TEXT NOT NULL,
+  started_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at    TIMESTAMPTZ,
+  total_records   INT NOT NULL DEFAULT 0,
+  imported        INT NOT NULL DEFAULT 0,
+  duplicates_skipped INT NOT NULL DEFAULT 0,
+  classification_failures INT NOT NULL DEFAULT 0,
+  parse_errors    INT NOT NULL DEFAULT 0,
+  flagged_for_review INT NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'running'
+);
+
 CREATE TABLE import_records (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   problem_id      UUID NOT NULL REFERENCES problems(id),
@@ -1022,11 +1046,15 @@ Statement: ${p.statement}
 |------|----------|---------------|
 | Download datasets | Bandwidth | Free (HF, GitHub) |
 | Store raw snapshots | Blob Storage | ~$0.01 |
-| AI classification (12,000 problems × ~800 tok) | GPT-4o-mini Batch API | ~$1.50 |
+| AI classification (12,000 problems, Batch API) | GPT-4o-mini (input: 30M tok, output: 2.4M tok) | ~$3.00 |
 | Embedding generation (12,000 × ~200 tok) | text-embedding-3-small | ~$0.05 |
 | PostgreSQL writes | Included in monthly cost | $0 incremental |
 | AI Search indexing | Included in monthly cost | $0 incremental |
-| **Total one-time import cost** | | **~$1.56** |
+| **Total one-time import cost** | | **~$3.06** |
+
+This is **one-time** — the cost of importing the initial corpus. Subsequent
+dataset updates (re-importing with new problems) are incremental: only new
+problems (dedup-filtered) incur classification costs.
 
 ---
 

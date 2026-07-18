@@ -17,7 +17,7 @@ in `01-product-analysis.md` §7:
 | AI at ingestion, not at runtime | LLM calls happen in the async ingestion pipeline, not in the search/browse hot path |
 | Pre-compute everything possible | Embeddings and classifications are stored; search uses pre-indexed data |
 | Use the cheapest model that works | GPT-4o-mini for extraction/classification; text-embedding-3-small for vectors |
-| Prefer consumption-based pricing | Azure Functions Consumption plan; AI Search Basic tier; no always-on servers |
+| Prefer consumption-based pricing | Azure Functions Consumption plan; AI Search Free tier (upgrade to Basic when validated); no always-on servers |
 | No Cosmos DB | PostgreSQL Flexible Server (Burstable B1ms) for the entity model |
 | Scale with problems, not users | Ingestion cost grows with corpus; serving cost stays near-zero |
 
@@ -114,10 +114,14 @@ Five function groups, all in a single Function App:
 | Function | Trigger | Purpose | LLM Call? |
 |----------|---------|---------|-----------|
 | `upload-pdf` | HTTP POST | Validates file, stores in Blob, returns job ID | No |
-| `ingest-pipeline` | Blob trigger | Extracts, classifies, embeds, stores problems | **Yes** (ingestion-time) |
+| `ingest-pipeline` | Blob trigger | Extracts, classifies, embeds, stores problems from PDF | **Yes** (ingestion-time) |
+| `import-dataset` | HTTP POST (manual) | Imports from HF/GitHub datasets (Omni-MATH, etc.) | **Yes** (ingestion-time, Batch API) |
 | `browse-problems` | HTTP GET | Paginated queries against PostgreSQL | No |
 | `search-problems` | HTTP GET | Queries AI Search (structured + semantic) | No |
 | `chat-problems` | HTTP POST | RAG: retrieve from AI Search → generate with LLM | **Yes** (runtime — justified) |
+
+> **Dataset import details:** See `03-dataset-import-search.md` §5 for source
+> adapters, normalisation, and the full import pipeline.
 
 **Cold start mitigation:** Not needed for MVP (3–5 users). If latency matters
 later, use Azure Functions Premium plan's pre-warmed instances.
@@ -157,7 +161,11 @@ features (see `01-product-analysis.md` §5).
 PostgreSQL, it also pushes a flattened document to the AI Search index. This is
 a simple write-after-write pattern, not a change-feed sync.
 
-### 3.5 Azure AI Search (Basic Tier)
+### 3.5 Azure AI Search (Free Tier → Basic Tier)
+
+> **Launch on Free tier.** The taxonomy provides rich structured filters that
+> cover most search scenarios without vector/semantic search. Upgrade to Basic
+> when real trainer feedback validates the need. See §6 for tier strategy.
 
 A single index `problems` with structured fields + vector field:
 
@@ -188,19 +196,22 @@ A single index `problems` with structured fields + vector field:
 | Semantic (vector) | Cosine similarity on statement_vector | `"problems about partitioning integers into groups"` |
 | Hybrid | Full-text + vector, RRF fusion | Default for search bar queries |
 
-**Cost:** Basic tier = ~$75/month. Supports up to 2 GB indexes, 3 replicas.
+**Cost:** Free tier supports 50 MB index limit (12k problems ≈ 15 MB — fits).
+Basic tier (~$75/month) adds vector search, semantic reranking, up to 2 GB indexes.
 For 500 problems this is vast overkill — but Basic is the minimum tier that
 supports semantic ranking. If cost is prohibitive at launch, start with **Free
 tier** (50 MB, no semantic ranking) and use structured + full-text only.
 
 ### 3.6 Azure OpenAI
 
-| Model | Used For | When | Est. Cost (500 problems) |
-|-------|----------|------|--------------------------|
-| `gpt-4o-mini` | PDF extraction (parse problems from PDF text) | Ingestion | ~$0.50 |
-| `gpt-4o-mini` | Classification (assign topics, techniques, dims) | Ingestion | ~$0.30 |
+| Model | Used For | When | Est. Cost |
+|-------|----------|------|-----------|
+| `gpt-4o-mini` | PDF extraction (parse problems from PDF text) | Ingestion (Phase 2) | ~$0.50 per 500 PDFs |
+| `gpt-4o-mini` | Dataset classification (assign taxonomy codes) | Ingestion (Phase 1) | ~$3.00 for 12,000 problems (Batch API) |
 | `gpt-4o-mini` | Chat responses (RAG over retrieved problems) | Runtime | ~$0.01/query |
-| `text-embedding-3-small` | Generate statement embeddings | Ingestion | ~$0.01 |
+| `text-embedding-3-small` | Generate statement embeddings | Ingestion | ~$0.05 for 12,000 problems |
+
+> **Detailed import cost breakdown:** See `03-dataset-import-search.md` §10.
 
 **Why GPT-4o-mini for everything?** It's sufficient for structured extraction
 and classification tasks (JSON-mode output). The math content understanding
@@ -463,31 +474,47 @@ Trainer               React SPA              Browse API           PostgreSQL
 
 ## 6. Cost Estimate (MVP at Steady State)
 
-Assumptions: 500 problems indexed, 3–5 active users, ~50 queries/day, ~10 chat
-messages/day, ~2 PDF uploads/week.
+Assumptions: ~12,000 problems indexed, 3–5 active users, ~50 queries/day,
+~10 chat messages/day.
+
+### Recommended: Start on Free/Low tier, upgrade when validated
+
+| Resource | Recommended SKU | Monthly Cost |
+|----------|----------------|-------------|
+| Azure Static Web Apps | Free | $0 |
+| Azure Functions | Consumption | ~$0 (within free grant) |
+| Azure Blob Storage | Hot, LRS | ~$0.10 |
+| PostgreSQL Flexible Server | Burstable B1ms | ~$13 |
+| Azure AI Search | **Free** (see note below) | $0 |
+| Azure OpenAI (runtime: chat + query embeddings) | Pay-per-token | ~$0.50/month |
+| **Recommended monthly total** | | **~$14/month** |
+
+### AI Search tier strategy
+
+| Phase | Tier | Monthly Cost | What You Get | What You Lose |
+|-------|------|-------------|-------------|--------------|
+| **Launch (recommended)** | Free | $0 | Structured filters + BM25 full-text. 50 MB index (12k problems ≈ 15 MB — fits). | No vector search, no semantic reranking. |
+| **After validation** | Basic | $75 | Add vector search + semantic reranking. | — |
+
+**Why start Free:** The taxonomy provides excellent structured filterability
+(8 domains, 58 subtopics, 160+ techniques, 6 complexity dimensions). With this
+level of tagging, BM25 + structured filters will handle most trainer queries
+well. Vector/semantic search adds value for vague natural-language queries —
+but those are served by the chat API (which uses GPT-4o-mini regardless of
+search tier). Validate with real trainers before spending $75/month.
+
+### Full tier (if semantic search is needed immediately)
 
 | Resource | SKU | Monthly Cost |
 |----------|-----|-------------|
-| Azure Static Web Apps | Free | $0 |
-| Azure Functions | Consumption | ~$0 (well within free grant: 1M executions/month) |
-| Azure Blob Storage | Hot, LRS | ~$0.10 |
-| PostgreSQL Flexible Server | Burstable B1ms | ~$13 |
-| Azure AI Search | Basic | ~$75 |
-| Azure OpenAI (runtime: chat + search embeddings) | Pay-per-token | ~$2/month |
-| Azure OpenAI (ingestion: one-time for 500 problems) | Pay-per-token | ~$1 total |
-| **Total monthly** | | **~$90/month** |
+| Azure AI Search | Basic | +$75 |
+| **Full monthly total** | | **~$89/month** |
 
-**Cost reduction options if $90/month is too much:**
+### One-time costs
 
-| Option | Savings | Trade-off |
-|--------|---------|-----------|
-| Use AI Search **Free tier** instead of Basic | −$75/month | Lose semantic/vector search; structured + full-text only. 50 MB index limit. |
-| Use **SQLite on Functions** instead of PostgreSQL | −$13/month | No managed database; data lives in blob-backed SQLite. Harder to query ad-hoc. |
-| Skip vector search entirely | −$0 resource, −complexity | Rely on structured filters + BM25 full-text. Still effective for taxonomy-tagged problems. |
-
-**$15/month floor:** Static Web Apps (free) + Functions (free) + Blob ($0.10) +
-PostgreSQL B1ms ($13) + OpenAI runtime (~$2). This gives browse + structured search +
-chat without vector/semantic search.
+| Item | Cost |
+|------|------|
+| Initial dataset import (12k problems) | ~$3.06 (see `03-dataset-import-search.md` §10) |
 
 ---
 
