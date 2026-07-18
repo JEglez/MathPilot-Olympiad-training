@@ -233,16 +233,19 @@ multiple axes rather than a single difficulty number.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `competition_position` | enum | `early` (P1/P4), `middle` (P2/P5), `late` (P3/P6) |
+| `competition_level` | enum | `local`, `state`, `national`, `international` — which stage of the olympiad pipeline |
+| `position_in_paper` | enum | `early`, `middle`, `late` — position within the specific competition paper |
 | `proof_style` | enum | `construction`, `existence`, `bound`, `characterisation`, `computation` |
 | `creativity_demand` | enum | `low`, `medium`, `high`, `extreme` |
 | `multi_technique_depth` | int | How many distinct techniques are combined (1–5+) |
 
 **Why no single `difficulty` field?**
 
-The `competition_position` approximates traditional difficulty but is *contextual*
-to the competition. A "P1" on the IMO is harder than a "P3" on a regional
-olympiad. The system computes **personalised difficulty** at query time:
+Difficulty is not a static property of the problem — it depends on *who is solving it*.
+A problem classified as `competition_level: national` may be trivial to an IMO
+medallist but impenetrable to a state-level student. The `competition_level` tells
+you where the problem sits in the olympiad pipeline (local → state → national →
+international), while the system computes **personalised difficulty** at query time:
 
 ```
 personalised_difficulty(problem, student) =
@@ -264,7 +267,8 @@ personalised_difficulty(problem, student) =
 Problem:
   title: "Coloured Points on a Circle"
   source: IMO 2023 Shortlist, C4
-  competition_position: middle
+  competition_level: international
+  position_in_paper: middle
   proof_style: existence
   creativity_demand: high
   multi_technique_depth: 2
@@ -567,7 +571,7 @@ Instead of `problem.difficulty = 7`, the system computes:
                     │       student_mastery,        │
                     │       multi_technique_depth,  │
                     │       creativity_demand,      │
-                    │       competition_position )  │
+                    │       competition_level )     │
                     └──────────────────────────────┘
                          ▲                ▲
                          │                │

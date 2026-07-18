@@ -620,15 +620,39 @@ Instead of a single 1–10 rating, every problem is classified along **6 orthogo
 dimensions**. Each dimension is low-cardinality (3–5 values) and independently
 meaningful.
 
-### Dimension 1: Competition Position
+### Dimension 1: Competition Level
 
-Where the problem typically appears in an olympiad.
+The level of competition where this problem would naturally appear. This aligns
+with the 3-tier structure of the taxonomy and reflects the student's progression
+through the Mexican (and international) olympiad pipeline.
 
-| Value | Meaning | Example Slot |
-|-------|---------|--------------|
-| `opener` | Accessible with standard techniques | IMO P1/P4, USAMO P1 |
-| `middle` | Requires insight or technique combination | IMO P2/P5, USAMO P2 |
-| `closer` | Deep, multi-step, requires invention | IMO P3/P6, USAMO P3 |
+| Value | Meaning | Example Competitions (Mexico) | International Equivalents |
+|-------|---------|-------------------------------|--------------------------|
+| `local` | Solvable with Tier 1 (foundational) techniques. Emphasises basic reasoning, pattern recognition, and elementary tools. | OMM Municipal, Olimpiada Estatal (early rounds), school-level competitions | AMC 10/12, UK Junior Maths Challenge, SASMO |
+| `state` | Requires solid Tier 1 mastery and emerging Tier 2 skills. Problems are tricky but use accessible tools. | OMM Estatal (final rounds), Concurso Nacional (qualifying), state selection exams | AIME, UK Intermediate Maths Olympiad, ARML |
+| `national` | Requires Tier 2 techniques and some Tier 3 exposure. Multi-step proofs, insight, and technique combination expected. | OMM Nacional, Selectivo Preolímpico, Iberoamericana shortlist | USAMO / USA(J)MO, BMO Round 2, China MO prelim, ISL easy |
+| `international` | Requires Tier 3 mastery and creative synthesis. Deep problems with non-obvious approaches. | OMM Selectivo Internacional, Iberoamericana, Olimpiada de la Cuenca del Pacífico | IMO, ISL (medium/hard), APMO, Putnam A5–B6 |
+
+**Why this replaces "opener / middle / closer":**
+
+- The old dimension was *relative to a single contest* — an IMO "opener" (P1) is
+  harder than most national competitions' hardest problem. It conveyed position,
+  not absolute level.
+- The new dimension is *absolute* — it tells you which stage of the olympiad
+  pipeline a student needs to be at to attempt this problem.
+- It maps directly to our tier system: a `local` problem uses Tier 1 techniques,
+  a `national` problem uses Tier 2, etc.
+
+**Within-level ordering:** When more granularity is needed (e.g., distinguishing
+an easy P1 from a hard P1 within a national olympiad), use the `position_in_paper`
+metadata field on the Problem entity:
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `position_in_paper` | `early`, `middle`, `late` | Position within the specific competition paper (P1 vs P3) |
+
+This gives **two orthogonal axes**: the *competition level* (which pipeline stage)
+and the *within-paper position* (how hard relative to that competition's norms).
 
 ### Dimension 2: Technique Depth
 
@@ -697,7 +721,8 @@ For a student who knows the required techniques.
 | **Domains** | `GEO-S`, `ALG-INQ` | Synthetic geometry + inequality reasoning |
 | **Subtopics** | `GEO-S-TRI`, `ALG-INQ` | Triangle geometry, area inequalities |
 | **Techniques** | `T-ANGCHASE`, `T-AMGM` | Angle chasing for setup, AM-GM for the inequality |
-| **Competition Position** | `middle` | P2 slot |
+| **Competition Level** | `international` | IMO-level problem |
+| **Position in Paper** | `middle` | P2 slot |
 | **Technique Depth** | `compound` | 2 techniques |
 | **Creativity Demand** | `insightful` | Non-obvious connection between areas and angles |
 | **Proof Style** | `characterisation` | "Find all points such that…" |
@@ -825,7 +850,7 @@ generate_training_plan(student S, weeks N, target_competition C):
 |------------|------------------|-----------------|
 | "Pigeonhole problems in number theory" | technique = `T-PHP` AND domain = `NT` | `WHERE 'T-PHP' IN techniques AND 'NT' IN domains` |
 | "Easy geometry for beginners" | domain = `GEO-S` AND cognitive_load = foundational | `WHERE domain = 'GEO-S' AND all_techniques.cognitive_load = 'foundational'` |
-| "Hard IMO shortlist combinatorics" | competition = ISL AND domain = `COMB-*` AND position = `closer` | `WHERE competition = 'ISL' AND domain LIKE 'COMB%' AND position = 'closer'` |
+| "Hard IMO shortlist combinatorics" | competition = ISL AND domain = `COMB-*` AND level = `international` | `WHERE competition = 'ISL' AND domain LIKE 'COMB%' AND competition_level = 'international'` |
 | "Problems that use both generating functions and AM-GM" | techniques ⊇ {`T-OGF`, `T-AMGM`} | `WHERE techniques @> ARRAY['T-OGF','T-AMGM']` |
 | "Existence proofs requiring creativity" | proof_style = `existence` AND creativity = `inventive+` | `WHERE proof_style = 'existence' AND creativity >= 'inventive'` |
 | "Problems I'm ready for right now" | personalised_difficulty(P, me) ∈ [0.2, 0.5] | Computed at query time from student mastery |
