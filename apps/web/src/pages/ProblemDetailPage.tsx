@@ -49,7 +49,10 @@ export function ProblemDetailPage() {
             <span className={styles.level}>{problem.competition_level}</span>
           )}
         </div>
-        <h1 className={styles.title}>{problem.title}</h1>
+        <h1
+          className={styles.title}
+          dangerouslySetInnerHTML={{ __html: renderLatexToHtml(problem.title) }}
+        />
       </header>
 
       <div className={styles.tags}>
@@ -127,7 +130,7 @@ export function ProblemDetailPage() {
                   onClick={() => navigate(`/problems/${r.id}`)}
                   type="button"
                 >
-                  <span>{r.title}</span>
+                  <span dangerouslySetInnerHTML={{ __html: renderLatexToHtml(r.title) }} />
                   <span className={styles.relType}>{r.relationship_type}</span>
                 </button>
               </li>

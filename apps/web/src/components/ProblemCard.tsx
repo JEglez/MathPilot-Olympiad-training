@@ -14,6 +14,7 @@ export function ProblemCard({ problem, onSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const statementHtml = renderLatexToHtml(problem.statement);
+  const titleHtml = renderLatexToHtml(problem.title);
 
   return (
     <article className={styles.card}>
@@ -42,14 +43,14 @@ export function ProblemCard({ problem, onSelect }: Props) {
               type="button"
               // Safe: rendered by KaTeX
               // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: renderLatexToHtml(problem.title) }}
+              dangerouslySetInnerHTML={{ __html: titleHtml }}
             />
           ) : (
             <Link
               to={`/problems/${problem.id}`}
               // Safe: rendered by KaTeX
               // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: renderLatexToHtml(problem.title) }}
+              dangerouslySetInnerHTML={{ __html: titleHtml }}
             />
           )}
         </h2>
