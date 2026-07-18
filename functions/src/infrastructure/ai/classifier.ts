@@ -50,9 +50,11 @@ export class OpenAIClassifier {
   private readonly config: ClassifierConfig;
 
   // Circuit breaker (ai-guidelines.md §6)
+  // MAX_FAILURES raised for long ingestion runs — circuit trips only on
+  // sustained API outage, not occasional invalid_json from complex problems.
   private consecutiveFailures = 0;
   private circuitOpenUntil: Date | null = null;
-  private static readonly MAX_FAILURES = 3;
+  private static readonly MAX_FAILURES = 20;
   private static readonly CIRCUIT_OPEN_MS = 60_000;
 
   constructor(config: ClassifierConfig) {
@@ -128,8 +130,8 @@ export class OpenAIClassifier {
             ],
             response_format: { type: "json_object" },
             // gpt-5-mini is a reasoning model: reasoning tokens + output tokens both count
-            // toward max_completion_tokens. Need ~1500 reasoning + ~500 JSON output = 2000 total.
-            max_completion_tokens: 2000,
+            // toward max_completion_tokens. Need ~2000 reasoning + ~500 JSON output = 3000 total.
+            max_completion_tokens: 3000,
           }),
         },
         TIMEOUT_MS,
@@ -146,13 +148,13 @@ export class OpenAIClassifier {
       const rawContent = data.choices?.[0]?.message?.content;
 
       if (!rawContent) {
-        this.recordFailure();
+        // Empty content = reasoning tokens exhausted; don't count as API failure
         return err({ kind: "invalid_json", rawResponse: JSON.stringify(data) });
       }
 
       const parsed = parseClassificationOutput(rawContent);
       if (!parsed.ok) {
-        this.recordFailure();
+        // Schema mismatch is a content issue, not an API outage — don't trip circuit
         return parsed;
       }
 
