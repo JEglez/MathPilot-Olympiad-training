@@ -307,6 +307,51 @@ Problem:
 
 ---
 
+### 5a. Problem Translation
+
+**Purpose:** A translation of a Problem's text into another language. The Problem
+entity stores the **original** statement in its source language. Translations are
+separate entities so that a single problem (with one set of classifications,
+techniques, and solutions) can be read by students in different languages.
+
+**Key design choice:** A translated problem is **not** a separate Problem. The
+mathematical content — techniques, classification, solutions, relationships — is
+language-independent. Only the human-readable text (statement, title) varies.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `problem_id` | FK → Problem | The problem being translated |
+| `language` | string | Target language (`es`, `en`, `zh`, `fr`, etc.) |
+| `title` | string | Translated title |
+| `statement` | text | Translated problem statement (LaTeX) |
+| `translated_by` | string | Who translated (person name or `ai`) |
+| `verified` | bool | Has a human verified this translation? |
+| `created_at` | timestamp | |
+
+**Relationships:**
+- Belongs to → **Problem**
+- Problem's `language` field indicates the *original* language
+- Translations are *additional* languages
+
+**Example:**
+```
+Problem:
+  id: prob-001
+  language: es  (original)
+  title: "Puntos coloreados en un círculo"
+  statement: "Sean n puntos sobre un círculo..."
+
+  translations:
+    - language: en
+      title: "Coloured Points on a Circle"
+      statement: "Let n points on a circle..."
+      translated_by: "coach-juan"
+      verified: true
+```
+
+---
+
 ### 5b. Solution
 
 **Purpose:** A distinct solution approach to a Problem. Extracted from
@@ -445,6 +490,7 @@ objectives and aggregated topic-level proficiency.
 | `target_year` | int | Competition year |
 | `training_start_date` | date | When they started on the platform |
 | `weekly_hours_budget` | float | Available training hours per week |
+| `preferred_language` | string | Language for content delivery (e.g. `es`, `en`) |
 | `preferred_topics` | FK[] → Topic | Topics they enjoy (for motivation) |
 
 **Mastery tracking (separate table `student_mastery`):**
@@ -789,6 +835,7 @@ erDiagram
     Subtopic }o--o{ Subtopic : "prerequisite of"
 
     Competition ||--o{ Problem : "source of"
+    Problem ||--o{ ProblemTranslation : "translated to"
     Problem ||--o{ Solution : "solved by"
     Problem }o--o{ Topic : "tagged with"
     Problem }o--o{ Subtopic : "classified under"
