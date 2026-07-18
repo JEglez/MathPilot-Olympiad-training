@@ -38,18 +38,14 @@ export function ProblemCard({ problem, onSelect }: Props) {
         <h2 className={styles.title}>
           {onSelect ? (
             <button
-              className={styles.titleButton}
-              onClick={() => onSelect(problem.id)}
-              type="button"
-              // Safe: rendered by KaTeX
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: titleHtml }}
-            />
+                className={styles.titleButton}
+                onClick={() => onSelect(problem.id)}
+                type="button"
+                dangerouslySetInnerHTML={{ __html: titleHtml }}
+              />
           ) : (
             <Link
               to={`/problems/${problem.id}`}
-              // Safe: rendered by KaTeX
-              // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: titleHtml }}
             />
           )}
