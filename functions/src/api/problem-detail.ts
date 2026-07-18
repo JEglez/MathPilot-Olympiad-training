@@ -173,7 +173,7 @@ WITH curated AS (
   WHERE pr.problem_a_id = $1 OR pr.problem_b_id = $1
   LIMIT 5
 ),
-similar AS (
+vec_similar AS (
   SELECT
     p.id AS related_id,
     'similar' AS relationship_type,
@@ -187,7 +187,7 @@ similar AS (
 merged AS (
   SELECT * FROM curated
   UNION
-  SELECT * FROM similar
+  SELECT * FROM vec_similar
   WHERE related_id NOT IN (SELECT related_id FROM curated)
 )
 SELECT m.related_id, p.title, m.relationship_type, m.similarity

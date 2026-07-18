@@ -66,9 +66,12 @@ export function parseOlympiadBenchFilename(filename: string): {
     return { competition: null, year: null, round: null };
   }
   const [, comp, yearStr, round] = match;
+  if (!comp || !yearStr) {
+    return { competition: null, year: null, round: null };
+  }
   return {
     competition: comp.toUpperCase(),
     year: parseInt(yearStr, 10),
-    round: round,
+    round: round ?? null,
   };
 }
