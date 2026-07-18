@@ -16,6 +16,14 @@ on:
         description: 'Dry run (fetch + parse only, no DB writes)'
         type: boolean
         default: true
+      run_migrations:
+        description: 'Run DB migrations 001–004 (first run only)'
+        type: boolean
+        default: false
+      seed_taxonomy:
+        description: 'Load taxonomy seed data (first run only)'
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -41,6 +49,39 @@ jobs:
         run: npm ci
         working-directory: scripts/ingestion
 
+      # ── Optional: DB setup (first run only) ────────────────────────────────
+
+      - name: Install PostgreSQL client
+        if: inputs.run_migrations || inputs.seed_taxonomy
+        run: sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Run DB migrations (001–004)
+        if: inputs.run_migrations
+        run: |
+          for f in db/migrations/001_create_taxonomy.sql \
+                   db/migrations/002_create_problems.sql \
+                   db/migrations/003_create_join_tables.sql \
+                   db/migrations/004_create_import_tables.sql; do
+            echo "  Running $f"
+            psql "$MATHPILOT_DB_URL" -f "$f" -v ON_ERROR_STOP=1
+          done
+          echo "Migrations complete (005_create_search_indexes.sql runs after bulk import)"
+        env:
+          MATHPILOT_DB_URL: ${{ secrets.MATHPILOT_DB_URL }}
+
+      - name: Load taxonomy seed data
+        if: inputs.seed_taxonomy
+        run: |
+          for f in topics subtopics techniques competitions; do
+            echo "  Seeding $f"
+            psql "$MATHPILOT_DB_URL" -f "db/seed/$f.sql" -v ON_ERROR_STOP=1
+          done
+          echo "Seed data loaded"
+        env:
+          MATHPILOT_DB_URL: ${{ secrets.MATHPILOT_DB_URL }}
+
+      # ── Ingestion ───────────────────────────────────────────────────────────
+
       - name: Run ingestion
         run: npx tsx run.ts
         working-directory: scripts/ingestion
@@ -52,3 +93,15 @@ jobs:
           MATHPILOT_EMBEDDING_MODEL:      ${{ secrets.MATHPILOT_EMBEDDING_MODEL }}
           IMPORT_SOURCE:                  ${{ inputs.source }}
           DRY_RUN:                        ${{ inputs.dry_run }}
+
+      # ── Optional: post-import search indexes (run after first full import) ──
+
+      - name: Create search indexes (005)
+        if: ${{ !inputs.dry_run && inputs.run_migrations }}
+        run: |
+          echo "Creating HNSW + GIN indexes (this may take several minutes)..."
+          psql "$MATHPILOT_DB_URL" -f "db/migrations/005_create_search_indexes.sql" -v ON_ERROR_STOP=1
+          echo "Search indexes created"
+        env:
+          MATHPILOT_DB_URL: ${{ secrets.MATHPILOT_DB_URL }}
+
