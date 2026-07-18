@@ -1,0 +1,48 @@
+# GitHub Actions workflow — Olympiad problem ingestion
+# Trigger manually: Actions tab → "Ingestion" → Run workflow
+# See architecture-principles.md §11 for operational script rules
+
+name: Ingestion
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Dataset to import'
+        type: choice
+        options: [all, omni-math, olympiad-bench, olympmath, numina-math]
+        default: all
+      dry_run:
+        description: 'Dry run (fetch + parse only, no DB writes)'
+        type: boolean
+        default: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6h — Batch API can take hours
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/ingestion/package.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: scripts/ingestion
+
+      - name: Run ingestion
+        run: node run.js
+        working-directory: scripts/ingestion
+        env:
+          MATHPILOT_DB_URL:               ${{ secrets.MATHPILOT_DB_URL }}
+          MATHPILOT_OPENAI_ENDPOINT:      ${{ secrets.MATHPILOT_OPENAI_ENDPOINT }}
+          MATHPILOT_OPENAI_API_KEY:       ${{ secrets.MATHPILOT_OPENAI_API_KEY }}
+          MATHPILOT_CLASSIFICATION_MODEL: ${{ secrets.MATHPILOT_CLASSIFICATION_MODEL }}
+          MATHPILOT_EMBEDDING_MODEL:      ${{ secrets.MATHPILOT_EMBEDDING_MODEL }}
+          IMPORT_SOURCE:                  ${{ inputs.source }}
+          DRY_RUN:                        ${{ inputs.dry_run }}

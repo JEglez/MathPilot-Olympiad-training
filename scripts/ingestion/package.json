@@ -1,0 +1,14 @@
+{
+  "name": "mathpilot-ingestion",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node run.js"
+  },
+  "dependencies": {
+    "pg": "8.11.3",
+    "zod": "3.23.8"
+  }
+}
