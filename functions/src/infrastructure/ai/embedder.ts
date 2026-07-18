@@ -2,6 +2,8 @@
 // Generates text-embedding-3-small (1536 dimensions) for pgvector storage
 // Per ai-guidelines.md §4.2 and 03-dataset-import-search.md §5.4
 
+import type { EmbeddingGenerator } from "../../domain/shared/embedding-generator.js";
+
 export interface EmbeddingGeneratorConfig {
   /** From env: MATHPILOT_EMBEDDING_MODEL (e.g. text-embedding-3-small) */
   readonly modelId: string;
@@ -9,7 +11,7 @@ export interface EmbeddingGeneratorConfig {
   readonly apiKey: string;
 }
 
-export class OpenAIEmbedder {
+export class OpenAIEmbedder implements EmbeddingGenerator {
   private readonly config: EmbeddingGeneratorConfig;
   // Conservative batch: ~100 inputs keeps each request well under 300K TPM
   private static readonly BATCH_SIZE = 100;
@@ -26,8 +28,9 @@ export class OpenAIEmbedder {
     this.config = config;
   }
 
-  /** Embed a single text string. Returns a 1536-dimensional vector. */
-  async embed(text: string): Promise<number[]> {
+  /** Embed a single text string. Returns null when the circuit breaker is open. */
+  async embed(text: string): Promise<number[] | null> {
+    if (this.isCircuitOpen()) return null;
     const [embedding] = await this.embedBatch([text]);
     if (!embedding) throw new Error("Embedding returned empty result");
     return embedding;
