@@ -71,7 +71,7 @@ jobs:
           OUTPUT=$(az deployment group create \
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --template-file infra/main.bicep \
-            --parameters location=westus2 prefix=omm-mathpilot environment=${{ inputs.environment }} openaiLocation=eastus \
+            --parameters location=eastus prefix=omm-mathpilot environment=${{ inputs.environment }} \
             --parameters pgAdminPassword="${{ secrets.MATHPILOT_PG_ADMIN_PASSWORD }}" \
             --query "properties.outputs" \
             --output json)

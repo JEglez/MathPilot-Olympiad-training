@@ -11,13 +11,10 @@
 //     --parameters pgAdminPassword=<secret>
 
 @description('Azure region for all resources')
-param location string = 'westus2'
+param location string = 'eastus'
 
 @description('Short prefix used for resource naming (e.g. "omm-mathpilot")')
 param prefix string = 'mathpilot'
-
-@description('Azure region for Azure OpenAI (must support gpt-4o-mini + text-embedding-3-small). Defaults to eastus. westus2 is NOT supported.')
-param openaiLocation string = 'eastus'
 
 @description('Environment tag (dev | staging | prod)')
 @allowed(['dev', 'staging', 'prod'])
@@ -54,7 +51,7 @@ module postgres 'modules/postgres.bicep' = {
 module openai 'modules/openai.bicep' = {
   name: 'openai'
   params: {
-    location: openaiLocation
+    location: location
     accountName: '${prefix}-openai'
     tags: tags
   }
