@@ -1,11 +1,12 @@
 // infra/params/dev.bicepparam
-// Development environment parameters for MathPilot MVP.
-// pgAdminPassword is NOT stored here — it is passed as a GitHub Secret
-// (MATHPILOT_PG_ADMIN_PASSWORD) at deploy time.
+// Development environment parameter reference for MathPilot MVP.
+// NOTE: pgAdminPassword is a @secure() param — it is passed at deploy time
+//       via GitHub Secret (MATHPILOT_PG_ADMIN_PASSWORD), never stored here.
+//
+// Used by deploy.yml as inline --parameters overrides:
+//   --parameters location=westus2 prefix=omm-mathpilot environment=dev \
+//   --parameters pgAdminPassword="${{ secrets.MATHPILOT_PG_ADMIN_PASSWORD }}"
 
-using '../main.bicep'
-
-param location = 'westus2'
-param prefix = 'omm-mathpilot'
-param environment = 'dev'
-// pgAdminPassword is injected by the deploy workflow
+// location  = westus2
+// prefix    = omm-mathpilot
+// environment = dev

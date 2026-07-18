@@ -45,11 +45,8 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' =
     highAvailability: {
       mode: 'Disabled'
     }
-    // Public access required for GitHub Actions runners.
-    // Restrict to specific IPs post-import if needed.
-    network: {
-      publicNetworkAccess: 'Enabled'
-    }
+    // Public access is controlled via firewall rules below.
+    // AllowAllAzureServices rule covers GitHub Actions hosted runners.
   }
 }
 
@@ -71,7 +68,6 @@ resource pgvectorExtension 'Microsoft.DBforPostgreSQL/flexibleServers/configurat
     value: 'vector'
     source: 'user-override'
   }
-  dependsOn: [postgresServer]
 }
 
 // Database
