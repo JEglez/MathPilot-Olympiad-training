@@ -77,25 +77,44 @@ const NuminaMathSchema = z.object({
   source:     z.string().optional(),
 });
 
-// ── Competition name → abbreviation map ───────────────────────────────────────
+// ── Competition resolver ───────────────────────────────────────────────────────
+// Maps raw source strings → { abbreviation, level }
+// Covers all 4 source datasets (recovered from docs/plan/03-dataset-import-search.md §4.3)
+
 const COMPETITION_MAP = {
-  "international mathematical olympiad": "IMO",
-  "imo":      "IMO",
-  "usamo":    "USAMO",
-  "aime":     "AIME",
-  "amc":      "AMC",
-  "putnam":   "PUTNAM",
-  "apmo":     "APMO",
-  "olympiad": "SHORTLIST",
+  // Omni-MATH source codes (snake_case keys)
+  imo:                       { abbreviation: "IMO",     level: "international" },
+  imo_shortlist:             { abbreviation: "ISL",     level: "international" },
+  imol:                      { abbreviation: "IMO",     level: "international" },
+  "international mathematical olympiad": { abbreviation: "IMO", level: "international" },
+  usa_team_selection_test:   { abbreviation: "USATST",  level: "national" },
+  china_team_selection_test: { abbreviation: "CNTST",   level: "national" },
+  putnam:                    { abbreviation: "PUTNAM",  level: "national" },
+  usamo:                     { abbreviation: "USAMO",   level: "national" },
+  usajmo:                    { abbreviation: "USAJMO",  level: "national" },
+  china_national_olympiad:   { abbreviation: "CNMO",    level: "national" },
+  apmo:                      { abbreviation: "APMO",    level: "international" },
+  balkan_mo:                 { abbreviation: "BALKAN",  level: "international" },
+  baltic_way:                { abbreviation: "BWAY",    level: "international" },
+  egmo:                      { abbreviation: "EGMO",    level: "international" },
+  aime:                      { abbreviation: "AIME",    level: "national" },
+  amc_8:                     { abbreviation: "AMC",     level: "local" },
+  amc_10:                    { abbreviation: "AMC",     level: "local" },
+  amc_12:                    { abbreviation: "AMC",     level: "local" },
+  hmmt:                      { abbreviation: "HMMT",    level: "national" },
+  omm:                       { abbreviation: "OMM",     level: "national" },
+  omm_regional:              { abbreviation: "OMEGAL",  level: "state" },
+  // OlympiadBench filename patterns
+  comp:                      { abbreviation: "COMP",    level: "national" },
+  // NuminaMath source categories
+  olympiads:                 { abbreviation: "SHORTLIST", level: "national" },
+  amc_aime:                  { abbreviation: "AMC",     level: "local" },
 };
 
 function resolveCompetition(raw) {
   if (!raw) return null;
-  const lower = raw.toLowerCase();
-  for (const [key, abbr] of Object.entries(COMPETITION_MAP)) {
-    if (lower.includes(key)) return abbr;
-  }
-  return null;
+  const key = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return COMPETITION_MAP[key] ?? null;
 }
 
 // ── LaTeX normalisation (keep display math, normalise whitespace) ─────────────
@@ -135,6 +154,7 @@ function parseOmniMath(raw) {
   const r = OmniMathSchema.parse(raw);
   const statement = normaliseLaTeX(r.problem);
   const domainHint = r.domain?.join(" ").toLowerCase() ?? "";
+  const comp = resolveCompetition(r.source);
   return {
     externalId:       `omni-math::${dedupHash(r.problem)}`,
     sourceDataset:    "omni-math",
@@ -143,7 +163,8 @@ function parseOmniMath(raw) {
     statementPlain:   stripLaTeX(r.problem),
     answer:           r.answer ?? null,
     solutions:        r.solution ? [r.solution] : [],
-    sourceCompetition:resolveCompetition(r.source),
+    sourceCompetition:comp?.abbreviation ?? null,
+    sourceLevel:      comp?.level ?? null,
     sourceSubject:    domainHint || null,
     sourceDifficulty: r.difficulty ? String(r.difficulty) : null,
     language:         "en",
@@ -158,6 +179,7 @@ function parseOlympiadBench(raw) {
   if (subj && !subj.includes("math") && (subj.includes("phys") || subj.includes("chem"))) return null;
   const statement = normaliseLaTeX(r.problem);
   const answer = Array.isArray(r.answer) ? r.answer.join("; ") : (r.answer ?? null);
+  const comp = resolveCompetition(r.source);
   return {
     externalId:       `olympiad-bench::${dedupHash(r.problem)}`,
     sourceDataset:    "olympiad-bench",
@@ -166,7 +188,8 @@ function parseOlympiadBench(raw) {
     statementPlain:   stripLaTeX(r.problem),
     answer,
     solutions:        r.solution ? [r.solution] : [],
-    sourceCompetition:resolveCompetition(r.source),
+    sourceCompetition:comp?.abbreviation ?? null,
+    sourceLevel:      comp?.level ?? null,
     sourceSubject:    r.subject ?? null,
     sourceDifficulty: r.difficulty ?? null,
     language:         "en",
@@ -187,7 +210,7 @@ function parseOlymMATH(raw) {
     answer:           r.answer ?? null,
     solutions:        r.solution ? [r.solution] : [],
     sourceCompetition:null,
-    sourceSubject:    null,
+    sourceLevel:      LEVEL_MAP[r.level] ?? null,
     sourceDifficulty: r.level ?? null,
     language:         "zh",
     dedupHash:        dedupHash(r.problem),
@@ -201,6 +224,7 @@ function parseNuminaMath(raw) {
   const statement = normaliseLaTeX(r.problem);
   // Trim long solutions
   const sol = r.solution ? r.solution.slice(0, 10_000) : null;
+  const comp = resolveCompetition(r.source);
   return {
     externalId:       `numina-math::${dedupHash(r.problem)}`,
     sourceDataset:    "numina-math",
@@ -209,7 +233,8 @@ function parseNuminaMath(raw) {
     statementPlain:   stripLaTeX(r.problem),
     answer:           r.answer ?? null,
     solutions:        sol ? [sol] : [],
-    sourceCompetition:resolveCompetition(r.source),
+    sourceCompetition:comp?.abbreviation ?? null,
+    sourceLevel:      comp?.level ?? null,
     sourceSubject:    null,
     sourceDifficulty: null,
     language:         "en",
@@ -330,7 +355,7 @@ async function insertProblem(client, problem, classification, embedding, importR
        VALUES ($1,$1,$2,false)
        ON CONFLICT (abbreviation) DO UPDATE SET abbreviation = EXCLUDED.abbreviation
        RETURNING id`,
-      [problem.sourceCompetition, classification?.competition_level ?? "national"],
+      [problem.sourceCompetition, classification?.competition_level ?? problem.sourceLevel ?? "national"],
     );
     competitionId = r.rows[0]?.id ?? null;
   }
@@ -348,7 +373,7 @@ async function insertProblem(client, problem, classification, embedding, importR
     [
       problem.title, problem.statement, problem.statementPlain, problem.answer,
       competitionId, problem.language,
-      classification?.competition_level ?? null,
+      classification?.competition_level ?? problem.sourceLevel ?? null,
       classification?.technique_depth ?? null,
       classification?.creativity_demand ?? null,
       classification?.proof_style ?? null,
