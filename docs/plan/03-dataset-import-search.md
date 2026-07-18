@@ -589,6 +589,185 @@ full index definition for deployment:
 }
 ```
 
+### 7.1 Field Classification Summary
+
+| Field | Searchable | Filterable | Facetable | Sortable | Purpose |
+|-------|:----------:|:----------:|:---------:|:--------:|---------|
+| `id` | | ✅ | | | Document key |
+| `title` | ✅ | | | | BM25 text search |
+| `statement` | ✅ | | | | BM25 text search (plain text, en.microsoft analyzer) |
+| `source_competition` | | ✅ | ✅ | | Filter by competition (IMO, USAMO, etc.) |
+| `source_year` | | ✅ | ✅ | ✅ | Filter/sort by year |
+| `competition_level` | | ✅ | ✅ | | Filter: local/state/national/international |
+| `topics` | | ✅ | ✅ | | Filter by domain codes (Collection) |
+| `subtopics` | | ✅ | ✅ | | Filter by subtopic codes (Collection) |
+| `techniques` | | ✅ | ✅ | | Filter by technique codes (Collection) |
+| `proof_style` | | ✅ | ✅ | | Filter by proof type |
+| `creativity_demand` | | ✅ | ✅ | | Filter by creativity level |
+| `technique_depth` | | ✅ | ✅ | | Filter: single/compound/synthesis |
+| `entry_barrier` | | ✅ | ✅ | | Filter: transparent/camouflaged/deceptive |
+| `language` | | ✅ | ✅ | | Filter by language |
+| `statement_vector` | ✅ (vector) | | | | Cosine similarity via HNSW |
+
+### 7.2 Search Mode Mechanics
+
+**Full-text (BM25):** Matches keywords in `title` and `statement`. The
+`en.microsoft` analyzer handles stemming and stop words. Good for specific
+terms ("pigeonhole", "cyclic quadrilateral", "Fermat").
+
+**Vector:** The query text is embedded via `text-embedding-3-small` and compared
+to `statement_vector` using cosine similarity (HNSW index, m=4, efSearch=500).
+Good for semantic intent ("problems about distributing objects into boxes" →
+finds pigeonhole problems even without the keyword).
+
+**Semantic reranking:** After BM25 retrieval, Azure AI Search reranks results
+using the `default-semantic` configuration (prioritises `title` and `statement`
+fields). Improves precision on natural-language queries.
+
+**Hybrid (default):** Combines BM25 + vector results using Reciprocal Rank
+Fusion (RRF). This is the default for all search bar queries — it gives the
+best of both worlds: keyword precision + semantic recall.
+
+### 7.3 Worked Example Queries
+
+#### Example 1: "Find geometry problems about cyclic quadrilaterals"
+
+```typescript
+// User types: "cyclic quadrilateral geometry"
+// UI has filter: topics = GEO-S
+
+const request = {
+  search: "cyclic quadrilateral",                   // BM25 on title + statement
+  vectorQueries: [{
+    vector: await embed("cyclic quadrilateral geometry problems"),
+    kNearestNeighborsCount: 50,
+    fields: "statement_vector",
+  }],
+  filter: "topics/any(t: t eq 'GEO-S')",           // structured filter
+  queryType: "semantic",
+  semanticConfiguration: "default-semantic",
+  top: 20,
+};
+
+// Returns problems tagged GEO-S whose statements mention cyclic quadrilaterals
+// or are semantically similar (e.g., problems about inscribed polygons, Ptolemy)
+```
+
+**What each search mode contributes:**
+- **BM25:** Finds problems with "cyclic quadrilateral" in the statement
+- **Vector:** Also finds problems about "inscribed quadrilaterals in a circle"
+  or "Ptolemy's inequality" (semantically related, different wording)
+- **Filter:** Excludes analytic geometry (GEO-A) and non-geometry problems
+
+#### Example 2: "Find problems similar to this one"
+
+```typescript
+// User clicks "Find similar" on problem prob-abc-123
+// System reads the problem's statement and embeds it
+
+const sourceProblem = await db.query(
+  "SELECT statement FROM problems WHERE id = $1", ["prob-abc-123"]
+);
+
+const request = {
+  search: "",                                       // no text search
+  vectorQueries: [{
+    vector: await embed(sourceProblem.statement),   // embed the source problem
+    kNearestNeighborsCount: 20,
+    fields: "statement_vector",
+  }],
+  filter: "id ne 'prob-abc-123'",                   // exclude the source problem
+  top: 10,
+};
+
+// Returns problems with the most similar mathematical content,
+// regardless of how they're tagged — pure semantic similarity
+```
+
+**Why vector-only works here:** "Similar" means mathematically related structure,
+not keyword overlap. Two problems about the same concept may use completely
+different phrasing. Vector similarity captures this better than BM25.
+
+**Post-processing:** The API also checks `problem_relationships` in PostgreSQL
+for curated similar/variant links (stored via ProblemRelationship entity) and
+merges those results with the vector search results, deduplicating by ID.
+
+#### Example 3: "Find beginner-friendly invariant problems"
+
+```typescript
+// User types: "invariant problems for beginners"
+// System interprets: GAME domain + foundational level
+
+const request = {
+  search: "invariant",                              // keyword
+  vectorQueries: [{
+    vector: await embed("beginner friendly invariant parity problems"),
+    kNearestNeighborsCount: 50,
+    fields: "statement_vector",
+  }],
+  filter: [
+    "techniques/any(t: t eq 'T-PARITY' or t eq 'T-COLOURING' or t eq 'T-MODINV')",
+    "competition_level eq 'local' or competition_level eq 'state'",
+    "entry_barrier eq 'transparent'",
+  ].join(" and "),
+  queryType: "semantic",
+  top: 15,
+};
+
+// Returns local/state level problems that use parity, colouring, or modular
+// invariants, with transparent entry barriers — ideal for a student starting
+// with invariant reasoning
+```
+
+**How taxonomy makes this work:**
+- `techniques` filter targets the specific foundational invariant techniques
+  from the GAME domain (Tier 1: `T-PARITY`, `T-COLOURING`, `T-TILING`)
+- `competition_level` filters to the local/state pipeline stage
+- `entry_barrier: transparent` ensures the student can see how to start
+
+#### Example 4: "Build a short number theory practice set"
+
+```typescript
+// Chat message: "Give me 6 number theory problems for a 2-hour session,
+//                mix of modular arithmetic and divisibility, state level"
+
+// Step 1: RETRIEVE — search for candidate problems
+const candidates = await searchClient.search({
+  search: "number theory modular arithmetic divisibility",
+  vectorQueries: [{
+    vector: await embed("number theory modular arithmetic divisibility practice"),
+    kNearestNeighborsCount: 50,
+    fields: "statement_vector",
+  }],
+  filter: [
+    "topics/any(t: t eq 'NT')",
+    "subtopics/any(s: s eq 'NT-MOD' or s eq 'NT-MOD-BAS' or s eq 'NT-DIV')",
+    "competition_level eq 'state'",
+  ].join(" and "),
+  queryType: "semantic",
+  top: 20,                                          // retrieve 20, let LLM pick 6
+});
+
+// Step 2: GENERATE — LLM selects and sequences
+const response = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    { role: "system", content: `You are a math olympiad coach.
+Select 6 problems from the RETRIEVED SET for a 2-hour practice session.
+Sequence them: 2 warm-up (routine), 3 main (insightful), 1 stretch (inventive).
+Only reference problems by their [id].` },
+    { role: "user", content: `Build a number theory practice set.
+Retrieved problems: ${JSON.stringify(candidates)}` },
+  ],
+});
+
+// Returns a curated set of 6 problems with ordering rationale
+```
+
+**Key design point:** The search layer retrieves a broad candidate set (20
+problems). The LLM in the chat layer curates and sequences — it doesn't search
+the index directly. This separation keeps search deterministic and cheap.
+
 ---
 
 ## 8. Search API
