@@ -23,7 +23,7 @@ const ClassificationOutputSchema = z.object({
     is_primary: z.boolean(),
   })).min(1).max(5),
   competition_level: z.enum(["local", "state", "national", "international"]),
-  position_in_paper: z.enum(["early", "middle", "late"]).nullable().optional(),
+  position_in_paper: z.enum(["early", "middle", "late"]).nullable().optional().catch(null),
   technique_depth: z.enum(["single", "compound", "synthesis"]),
   creativity_demand: z.enum(["routine", "insightful", "inventive", "breakthrough"]),
   proof_style: z.enum(["computation", "existence", "construction", "bound", "characterisation", "impossibility"]),
@@ -59,168 +59,42 @@ export class OpenAIClassifier {
     this.config = config;
   }
 
-  /** Classify a batch of problems using the Azure OpenAI Batch API */
+  /**
+   * Classify a batch of problems using concurrent direct chat completions.
+   * GlobalStandard SKU does not support the Batch API (requires globalbatch SKU),
+   * so we use direct calls with a concurrency cap to stay within TPM limits.
+   */
   async classifyBatch(
     problems: CanonicalProblem[],
   ): Promise<Map<string, Result<ClassificationOutput, ClassifyError>>> {
+    const results = new Map<string, Result<ClassificationOutput, ClassifyError>>();
     if (this.isCircuitOpen()) {
-      const results = new Map<string, Result<ClassificationOutput, ClassifyError>>();
       for (const p of problems) {
         results.set(p.externalId, err({ kind: "circuit_open" }));
       }
       return results;
     }
 
-    // Prepare JSONL batch file
-    const batchLines = problems.map(p => JSON.stringify({
-      custom_id: p.externalId,
-      method: "POST",
-      url: "/v1/chat/completions",
-      body: {
-        model: this.config.modelId,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserMessage({
-            statement: p.statementPlain,
-            sourceSubject: p.sourceSubject,
-            sourceDifficulty: p.sourceDifficulty,
-            sourceCompetition: p.sourceCompetition,
-          })},
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0,   // deterministic classification (ai-guidelines.md §2.2)
-        max_tokens: 400,
-      },
-      metadata: { prompt_version: CLASSIFICATION_PROMPT_VERSION },
-    }));
+    const CONCURRENCY = 5;
+    const INTER_GROUP_DELAY_MS = 200;
 
-    const results = new Map<string, Result<ClassificationOutput, ClassifyError>>();
-
-    // Step 1: Upload JSONL file to Azure OpenAI Files API
-    const jsonlBody = batchLines.join("\n");
-    const formData = new FormData();
-    formData.append("purpose", "batch");
-    formData.append("file", new Blob([jsonlBody], { type: "application/jsonl" }), "batch.jsonl");
-
-    const uploadRes = await fetchWithTimeout(
-      `${this.config.endpoint}/openai/files?api-version=2024-07-01-preview`,
-      { method: "POST", headers: { "api-key": this.config.apiKey }, body: formData },
-    );
-    if (!uploadRes.ok) {
-      this.recordFailure();
-      for (const p of problems) {
-        results.set(p.externalId, err({ kind: "api_error", message: `File upload failed: ${uploadRes.status}` }));
+    for (let i = 0; i < problems.length; i += CONCURRENCY) {
+      const group = problems.slice(i, i + CONCURRENCY);
+      const groupResults = await Promise.all(group.map(p => this.classifySingle(p)));
+      for (let j = 0; j < group.length; j++) {
+        results.set(group[j]!.externalId, groupResults[j]!);
       }
-      return results;
-    }
-    const { id: fileId } = await uploadRes.json() as { id: string };
-
-    // Step 2: Create batch job
-    const batchRes = await fetchWithTimeout(
-      `${this.config.endpoint}/openai/batches?api-version=2024-07-01-preview`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "api-key": this.config.apiKey },
-        body: JSON.stringify({
-          input_file_id: fileId,
-          endpoint: "/v1/chat/completions",
-          completion_window: "24h",
-        }),
-      },
-    );
-    if (!batchRes.ok) {
-      this.recordFailure();
-      for (const p of problems) {
-        results.set(p.externalId, err({ kind: "api_error", message: `Batch create failed: ${batchRes.status}` }));
-      }
-      return results;
-    }
-    const { id: batchId } = await batchRes.json() as { id: string };
-
-    // Step 3: Poll until completed (max 24h, 30s intervals with exponential backoff cap)
-    let outputFileId: string | null = null;
-    const POLL_START_MS = 30_000;
-    const POLL_MAX_MS = 300_000;  // 5 minutes
-    const POLL_DEADLINE = Date.now() + 24 * 60 * 60 * 1_000;
-    let pollInterval = POLL_START_MS;
-
-    while (Date.now() < POLL_DEADLINE) {
-      await sleep(pollInterval);
-      pollInterval = Math.min(pollInterval * 1.5, POLL_MAX_MS);
-
-      const statusRes = await fetchWithTimeout(
-        `${this.config.endpoint}/openai/batches/${batchId}?api-version=2024-07-01-preview`,
-        { headers: { "api-key": this.config.apiKey } },
-      );
-      if (!statusRes.ok) continue;
-
-      const status = await statusRes.json() as { status: string; output_file_id?: string; error_file_id?: string };
-
-      if (status.status === "completed" && status.output_file_id) {
-        outputFileId = status.output_file_id;
-        break;
-      }
-      if (status.status === "failed" || status.status === "cancelled" || status.status === "expired") {
-        this.recordFailure();
-        for (const p of problems) {
-          results.set(p.externalId, err({ kind: "api_error", message: `Batch ${status.status}` }));
-        }
-        return results;
-      }
-      // statuses "validating" | "in_progress" | "finalizing" → keep polling
-    }
-
-    if (!outputFileId) {
-      this.recordFailure();
-      for (const p of problems) {
-        results.set(p.externalId, err({ kind: "timeout" }));
-      }
-      return results;
-    }
-
-    // Step 4: Download output file and parse per-request results
-    const downloadRes = await fetchWithTimeout(
-      `${this.config.endpoint}/openai/files/${outputFileId}/content?api-version=2024-07-01-preview`,
-      { headers: { "api-key": this.config.apiKey } },
-    );
-    if (!downloadRes.ok) {
-      this.recordFailure();
-      for (const p of problems) {
-        results.set(p.externalId, err({ kind: "api_error", message: `Output download failed: ${downloadRes.status}` }));
-      }
-      return results;
-    }
-
-    const outputText = await downloadRes.text();
-    for (const line of outputText.split("\n")) {
-      if (!line.trim()) continue;
-      type BatchOutputLine = {
-        custom_id: string;
-        response?: { status_code: number; body: { choices: Array<{ message: { content: string } }> } };
-        error?: { message: string };
-      };
-      const parsed = JSON.parse(line) as BatchOutputLine;
-      const { custom_id, response, error } = parsed;
-
-      if (error ?? !response) {
-        results.set(custom_id, err({ kind: "api_error", message: error?.message ?? "missing response" }));
-        continue;
-      }
-
-      const content = response.body.choices[0]?.message.content ?? "";
-      const parseResult = ClassificationOutputSchema.safeParse(JSON.parse(content));
-      if (!parseResult.success) {
-        results.set(custom_id, err({ kind: "invalid_output", raw: content }));
-      } else {
-        this.recordSuccess();
-        results.set(custom_id, ok(parseResult.data));
+      if (i + CONCURRENCY < problems.length) {
+        await sleep(INTER_GROUP_DELAY_MS);
       }
     }
 
     return results;
   }
 
-  /** Classify a single problem synchronously (fallback when Batch API unavailable) */
+
+
+  /** Classify a single problem synchronously via direct chat completions */
   async classifySingle(
     problem: CanonicalProblem,
   ): Promise<Result<ClassificationOutput, ClassifyError>> {
@@ -240,7 +114,7 @@ export class OpenAIClassifier {
 
     try {
       const response = await fetchWithTimeout(
-        `${this.config.endpoint}/openai/deployments/${this.config.modelId}/chat/completions?api-version=2024-02-01`,
+        `${this.config.endpoint}/openai/deployments/${this.config.modelId}/chat/completions?api-version=2024-10-21`,
         {
           method: "POST",
           headers: {
@@ -253,8 +127,9 @@ export class OpenAIClassifier {
               { role: "user", content: userMessage },
             ],
             response_format: { type: "json_object" },
-            temperature: 0,
-            max_tokens: 400,
+            // gpt-5-mini is a reasoning model: reasoning tokens + output tokens both count
+            // toward max_completion_tokens. Need ~1500 reasoning + ~500 JSON output = 2000 total.
+            max_completion_tokens: 2000,
           }),
         },
         TIMEOUT_MS,
@@ -262,6 +137,8 @@ export class OpenAIClassifier {
 
       if (!response.ok) {
         this.recordFailure();
+        const errBody = await response.text().catch(() => "(unreadable)");
+        console.warn("classify:warn", { status: response.status, body: errBody });
         return err({ kind: "ai_unavailable", retryAfter: 60 });
       }
 
