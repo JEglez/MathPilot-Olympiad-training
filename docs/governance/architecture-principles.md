@@ -119,7 +119,53 @@
 | Bundle size (initial) | < 200KB gzipped |
 | AI classification latency | < 30s per problem (async, non-blocking) |
 
-## 10. Evolutionary Architecture
+## 11. Operational Scripts & One-Time Tools
+
+Not all code in this repo is application code. Some tasks are **operational** —
+they run once (or sporadically), are not invoked by users, and have no API surface.
+
+### What counts as a script
+
+- Data import / ingestion pipelines
+- Database back-fills and one-time migrations
+- Taxonomy seed and update tools
+- Benchmark / accuracy evaluation runs
+- Dataset preparation and normalisation
+
+These live in **`scripts/<purpose>/`** (e.g., `scripts/ingestion/`), NOT in
+`functions/src/` or `apps/`.
+
+### Different rules apply to scripts
+
+| Concern | Application code | Operational scripts |
+|---------|-----------------|---------------------|
+| Architecture | Layered DDD | **Flat — no layers** |
+| Error handling | `Result<T,E>` | `throw` / `process.exit(1)` is fine |
+| Branded IDs | Required | Not required |
+| Type safety | Strict, no `any` | Strict at **external boundaries only** (Zod for API/DB input) |
+| Tests | Co-located unit tests | Integration test or manual verification |
+| Logging | Structured logger | `console.log` / structured JSON to stdout |
+
+### Rules that still apply
+
+- **No secrets in code.** Read from environment variables.
+- **Idempotency.** Re-running a script must not corrupt data (use `ON CONFLICT DO NOTHING`, dedup checks).
+- **Exit code 1 on failure.** Scripts signal failure so CI can detect it.
+- **Document the run command** in a comment at the top of the file.
+
+### Execution model
+
+Operational scripts run via **GitHub Actions `workflow_dispatch`** (for
+anything taking > 5 minutes or needing cloud credentials) or locally for
+quick tasks. They are **not deployed** as Azure Functions or any always-on service.
+
+### Shared code
+
+Scripts may import from `db/migrations/` (SQL only, never TypeScript imports
+from `functions/src/`). If a script genuinely needs domain logic (e.g., the
+same dedup hash algorithm used at runtime), extract that logic to a
+**shared utility** in `packages/shared/` rather than coupling to either layer.
+
 
 - **Fitness functions** (automated checks) enforce architectural rules in CI.
 - **ADRs** document every significant architectural choice in `docs/adr/`.
