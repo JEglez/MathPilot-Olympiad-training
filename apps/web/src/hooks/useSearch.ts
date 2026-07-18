@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ProblemCard, SearchFilters, SearchResponse } from "../services/api";
-import { searchProblems } from "../services/api";
+import type { BrowseResponse, ProblemCard, SearchFilters, SearchResponse } from "../services/api";
+import { browseProblems, searchProblems } from "../services/api";
 
 interface UseSearchResult {
   readonly results: ProblemCard[];
@@ -16,7 +16,7 @@ interface UseSearchResult {
  * Returns search results, loading state, and error.
  */
 export function useSearch(filters: SearchFilters, debounceMs = 300): UseSearchResult {
-  const [data, setData] = useState<SearchResponse | null>(null);
+  const [data, setData] = useState<SearchResponse | BrowseResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,7 +33,12 @@ export function useSearch(filters: SearchFilters, debounceMs = 300): UseSearchRe
       setIsLoading(true);
       setError(null);
 
-      searchProblems(filters)
+      // Use browse endpoint when no query text — /api/search requires q
+      const request = filters.q?.trim()
+        ? searchProblems(filters)
+        : browseProblems(filters);
+
+      request
         .then((res) => {
           if (!ctrl.signal.aborted) {
             setData(res);
