@@ -150,7 +150,7 @@ All sources use LaTeX, but with inconsistencies. Normalise to a standard form:
 
 ### 4.2 Plain Text Generation
 
-Strip LaTeX to produce `statement_plain` for BM25 full-text search in AI Search:
+Strip LaTeX to produce `statement_plain` for tsvector full-text search:
 
 ```
 Input:  "Find all primes $p$ such that $p^2 + 2$ is also prime."
@@ -282,8 +282,8 @@ human review. Store via ProblemRelationship with `relationship_type: "dual"`.
 │       │                    │                   │                  │        │
 │       ▼                    ▼                   ▼                  ▼        │
 │  Blob Storage         Canonical           Azure OpenAI      PostgreSQL    │
-│  (raw dataset         Problem             GPT-4o-mini        + AI Search  │
-│   snapshots)          (in-memory)         (batch API)        index        │
+│  (raw dataset         Problem             GPT-4o-mini        (pgvector    │
+│   snapshots)          (in-memory)         (batch API)        + tsvector)  │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -432,7 +432,8 @@ layer post-classification (reject codes that don't exist).
 
 ### 5.4 Step 4: Store
 
-Write the classified problem to both PostgreSQL and Azure AI Search:
+Write the classified problem to PostgreSQL (the single source of truth and
+search engine via pgvector + tsvector):
 
 **PostgreSQL writes (single transaction per problem):**
 
@@ -446,14 +447,14 @@ ON CONFLICT (abbreviation) DO NOTHING;
 
 -- 2. Insert problem
 INSERT INTO problems (
-  id, title, statement, source_competition_id, source_year,
+  id, title, statement, statement_plain, source_competition_id, source_year,
   source_round, answer, language, status,
   competition_level, position_in_paper, technique_depth,
   creativity_demand, proof_style, entry_barrier,
-  estimated_solve_time_minutes, created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+  estimated_solve_time_minutes, statement_vector, created_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
   'draft',  -- all imports start as draft
-  $9, $10, $11, $12, $13, $14, $15, NOW());
+  $10, $11, $12, $13, $14, $15, $16, $embedding, NOW());
 
 -- 3. Insert join table rows
 INSERT INTO problem_topics (problem_id, topic_id)
@@ -480,35 +481,27 @@ INSERT INTO import_records (
 COMMIT;
 ```
 
-**AI Search write (after PostgreSQL commit):**
+**Embedding generation and storage (same transaction):**
 
-Push a flattened document to the `problems` index (schema defined in
-`02-mvp-architecture.md` §3.5) plus the embedding:
+After classification, embed the statement and store everything in PostgreSQL
+in a single transaction — no separate search index write needed:
 
 ```typescript
-const searchDoc = {
-  id: problem.id,
-  title: problem.title,
-  statement: problem.statement_plain,  // plain text for BM25
-  source_competition: problem.source_competition,
-  source_year: problem.source_year,
-  competition_level: problem.competition_level,
-  topics: problem.topics,
-  subtopics: problem.subtopics,
-  techniques: problem.techniques.map(t => t.code),
-  proof_style: problem.proof_style,
-  creativity_demand: problem.creativity_demand,
-  technique_depth: problem.technique_depth,
-  entry_barrier: problem.entry_barrier,
-  language: problem.language,
-  statement_vector: await embed(problem.statement_plain),
-};
+// Generate embedding
+const statementVector = await embed(problem.statement_plain);
 
-await searchClient.uploadDocuments([searchDoc]);
+// The INSERT in the transaction above includes:
+// statement_vector = $embedding (vector(1536) column via pgvector)
+// statement_plain is already stored for tsvector full-text search
+// (search_tsv is a GENERATED ALWAYS column — auto-populated)
 ```
 
 **Embedding generation:** `text-embedding-3-small` (1536 dimensions).
 ~12,000 problems × ~200 tokens avg = 2.4M tokens ≈ **$0.05** total.
+
+**Key simplification:** Because search uses pgvector and tsvector inside the
+same PostgreSQL database, there is no dual-write to a separate search service.
+The import pipeline writes once to PostgreSQL — that's it.
 
 ---
 
@@ -560,187 +553,233 @@ This table enables:
 
 ---
 
-## 7. Azure AI Search Index
+## 7. Search Schema (pgvector + tsvector in PostgreSQL)
 
-The index schema is defined in `02-mvp-architecture.md` §3.5. Here is the
-full index definition for deployment:
+All search capabilities live inside PostgreSQL — no separate search service.
+This section defines the search-specific columns and indexes added to the
+domain model tables.
 
-```json
-{
-  "name": "problems",
-  "fields": [
-    { "name": "id",                "type": "Edm.String",  "key": true, "filterable": true },
-    { "name": "title",             "type": "Edm.String",  "searchable": true },
-    { "name": "statement",         "type": "Edm.String",  "searchable": true, "analyzerName": "en.microsoft" },
-    { "name": "source_competition","type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "source_year",       "type": "Edm.Int32",   "filterable": true, "sortable": true, "facetable": true },
-    { "name": "competition_level", "type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "topics",            "type": "Collection(Edm.String)", "filterable": true, "facetable": true },
-    { "name": "subtopics",         "type": "Collection(Edm.String)", "filterable": true, "facetable": true },
-    { "name": "techniques",        "type": "Collection(Edm.String)", "filterable": true, "facetable": true },
-    { "name": "proof_style",       "type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "creativity_demand", "type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "technique_depth",   "type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "entry_barrier",     "type": "Edm.String",  "filterable": true, "facetable": true },
-    { "name": "language",          "type": "Edm.String",  "filterable": true, "facetable": true },
-    {
-      "name": "statement_vector",
-      "type": "Collection(Edm.Single)",
-      "searchable": true,
-      "dimensions": 1536,
-      "vectorSearchProfile": "default-vector-profile"
-    }
-  ],
-  "vectorSearch": {
-    "algorithms": [
-      { "name": "hnsw-algo", "kind": "hnsw", "hnswParameters": { "m": 4, "efConstruction": 400, "efSearch": 500, "metric": "cosine" } }
-    ],
-    "profiles": [
-      { "name": "default-vector-profile", "algorithmConfigurationName": "hnsw-algo" }
-    ]
-  },
-  "semantic": {
-    "configurations": [
-      {
-        "name": "default-semantic",
-        "prioritizedFields": {
-          "titleField": { "fieldName": "title" },
-          "contentFields": [{ "fieldName": "statement" }]
-        }
-      }
-    ]
-  }
-}
+### 7.0 Search Schema Definition
+
+```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Add search columns to problems table
+ALTER TABLE problems ADD COLUMN statement_plain TEXT;       -- LaTeX-stripped plain text
+ALTER TABLE problems ADD COLUMN statement_vector vector(1536); -- embedding from text-embedding-3-small
+
+-- Auto-generated tsvector for full-text search (title weighted higher)
+ALTER TABLE problems ADD COLUMN search_tsv tsvector
+  GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(statement_plain, '')), 'B')
+  ) STORED;
+
+-- HNSW index for vector similarity search (cosine distance)
+CREATE INDEX idx_problems_vector ON problems
+  USING hnsw (statement_vector vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
+
+-- GIN index for full-text search
+CREATE INDEX idx_problems_search ON problems USING gin (search_tsv);
+
+-- GIN indexes on join tables for fast taxonomy filtering
+CREATE INDEX idx_problem_topics_problem ON problem_topics (problem_id);
+CREATE INDEX idx_problem_topics_topic ON problem_topics (topic_id);
+CREATE INDEX idx_problem_subtopics_problem ON problem_subtopics (problem_id);
+CREATE INDEX idx_problem_techniques_problem ON problem_techniques (problem_id);
+
+-- Indexes on filterable enum columns
+CREATE INDEX idx_problems_level ON problems (competition_level);
+CREATE INDEX idx_problems_proof_style ON problems (proof_style);
+CREATE INDEX idx_problems_year ON problems (source_year);
+CREATE INDEX idx_problems_language ON problems (language);
 ```
 
-### 7.1 Field Classification Summary
+**Hybrid search query (RRF — Reciprocal Rank Fusion):**
 
-| Field | Searchable | Filterable | Facetable | Sortable | Purpose |
-|-------|:----------:|:----------:|:---------:|:--------:|---------|
-| `id` | | ✅ | | | Document key |
-| `title` | ✅ | | | | BM25 text search |
-| `statement` | ✅ | | | | BM25 text search (plain text, en.microsoft analyzer) |
-| `source_competition` | | ✅ | ✅ | | Filter by competition (IMO, USAMO, etc.) |
-| `source_year` | | ✅ | ✅ | ✅ | Filter/sort by year |
-| `competition_level` | | ✅ | ✅ | | Filter: local/state/national/international |
-| `topics` | | ✅ | ✅ | | Filter by domain codes (Collection) |
-| `subtopics` | | ✅ | ✅ | | Filter by subtopic codes (Collection) |
-| `techniques` | | ✅ | ✅ | | Filter by technique codes (Collection) |
-| `proof_style` | | ✅ | ✅ | | Filter by proof type |
-| `creativity_demand` | | ✅ | ✅ | | Filter by creativity level |
-| `technique_depth` | | ✅ | ✅ | | Filter: single/compound/synthesis |
-| `entry_barrier` | | ✅ | ✅ | | Filter: transparent/camouflaged/deceptive |
-| `language` | | ✅ | ✅ | | Filter by language |
-| `statement_vector` | ✅ (vector) | | | | Cosine similarity via HNSW |
+```sql
+WITH text_results AS (
+  SELECT id, ts_rank(search_tsv, query) AS text_score,
+         ROW_NUMBER() OVER (ORDER BY ts_rank(search_tsv, query) DESC) AS text_rank
+  FROM problems, plainto_tsquery('english', $query_text) query
+  WHERE search_tsv @@ query
+  LIMIT 50
+),
+vector_results AS (
+  SELECT id, 1 - (statement_vector <=> $query_vector) AS vector_score,
+         ROW_NUMBER() OVER (ORDER BY statement_vector <=> $query_vector) AS vector_rank
+  FROM problems
+  ORDER BY statement_vector <=> $query_vector
+  LIMIT 50
+),
+rrf AS (
+  SELECT COALESCE(t.id, v.id) AS id,
+         COALESCE(1.0 / (60 + t.text_rank), 0) +
+         COALESCE(1.0 / (60 + v.vector_rank), 0) AS rrf_score
+  FROM text_results t
+  FULL OUTER JOIN vector_results v ON t.id = v.id
+  ORDER BY rrf_score DESC
+  LIMIT $page_size OFFSET $offset
+)
+SELECT p.id, p.title, p.statement, p.answer,
+       p.source_year, p.source_round, p.language,
+       p.competition_level, p.proof_style,
+       p.creativity_demand, p.technique_depth, p.entry_barrier,
+       c.abbreviation AS competition,
+       rrf.rrf_score AS search_score,
+       json_agg(DISTINCT jsonb_build_object(
+         'code', tech.code, 'name', tech.name
+       )) AS techniques,
+       json_agg(DISTINCT jsonb_build_object(
+         'code', top.code, 'name', top.name
+       )) AS topics
+FROM rrf
+JOIN problems p ON rrf.id = p.id
+LEFT JOIN competitions c ON p.source_competition_id = c.id
+LEFT JOIN problem_techniques pt ON p.id = pt.problem_id
+LEFT JOIN techniques tech ON pt.technique_id = tech.id
+LEFT JOIN problem_topics ptop ON p.id = ptop.problem_id
+LEFT JOIN topics top ON ptop.topic_id = top.id
+-- Apply structured filters here:
+-- WHERE p.competition_level = $level
+-- AND EXISTS (SELECT 1 FROM problem_topics pt2 JOIN topics t2 ON pt2.topic_id = t2.id
+--             WHERE pt2.problem_id = p.id AND t2.code = ANY($topic_codes))
+GROUP BY p.id, c.abbreviation, rrf.rrf_score
+ORDER BY rrf.rrf_score DESC;
+```
+
+### 7.1 Search Capabilities Summary
+
+| Capability | Implementation | Column / Index |
+|-----------|---------------|----------------|
+| Full-text keyword search | `tsvector @@ tsquery` | `search_tsv` (GIN index) |
+| Vector similarity | `statement_vector <=> $query` | `statement_vector` (HNSW index) |
+| Filter by topic | `JOIN problem_topics` | GIN index on `problem_topics` |
+| Filter by subtopic | `JOIN problem_subtopics` | GIN index on `problem_subtopics` |
+| Filter by technique | `JOIN problem_techniques` | GIN index on `problem_techniques` |
+| Filter by competition level | `WHERE competition_level = $1` | B-tree index |
+| Filter by proof style | `WHERE proof_style = $1` | B-tree index |
+| Filter by competition | `JOIN competitions` | FK index |
+| Filter by year | `WHERE source_year BETWEEN $1 AND $2` | B-tree index |
+| Sort by year | `ORDER BY source_year` | B-tree index |
+| Facet counts | `GROUP BY ... COUNT(*)` | Computed in SQL |
+| Hybrid ranking | RRF over text_rank + vector_rank | Application-level CTE |
 
 ### 7.2 Search Mode Mechanics
 
-**Full-text (BM25):** Matches keywords in `title` and `statement`. The
-`en.microsoft` analyzer handles stemming and stop words. Good for specific
-terms ("pigeonhole", "cyclic quadrilateral", "Fermat").
+**Full-text (tsvector):** Matches keywords in `title` (weight A) and
+`statement_plain` (weight B). PostgreSQL's English dictionary handles stemming
+and stop words. Ranked by `ts_rank`. Good for specific terms ("pigeonhole",
+"cyclic quadrilateral", "Fermat").
 
-**Vector:** The query text is embedded via `text-embedding-3-small` and compared
-to `statement_vector` using cosine similarity (HNSW index, m=4, efSearch=500).
-Good for semantic intent ("problems about distributing objects into boxes" →
-finds pigeonhole problems even without the keyword).
+**Vector (pgvector):** The query text is embedded via `text-embedding-3-small`
+and compared to `statement_vector` using cosine distance (`<=>` operator) with
+an HNSW index (m=16, ef_construction=64). Good for semantic intent ("problems
+about distributing objects into boxes" → finds pigeonhole problems even without
+the keyword).
 
-**Semantic reranking:** After BM25 retrieval, Azure AI Search reranks results
-using the `default-semantic` configuration (prioritises `title` and `statement`
-fields). Improves precision on natural-language queries.
+**Hybrid (default):** Combines full-text + vector results using Reciprocal Rank
+Fusion (RRF) implemented as a SQL CTE (see §7.0). This is the default for all
+search bar queries — keyword precision + semantic recall.
 
-**Hybrid (default):** Combines BM25 + vector results using Reciprocal Rank
-Fusion (RRF). This is the default for all search bar queries — it gives the
-best of both worlds: keyword precision + semantic recall.
+**Note:** Azure AI Search's semantic reranking is not available with pgvector.
+The RRF fusion and rich taxonomy-based structured filtering compensate at MVP
+scale. If search quality needs improve, AI Search can be added as an upgrade.
 
 ### 7.3 Worked Example Queries
 
 #### Example 1: "Find geometry problems about cyclic quadrilaterals"
 
-```typescript
-// User types: "cyclic quadrilateral geometry"
-// UI has filter: topics = GEO-S
+```sql
+-- User types: "cyclic quadrilateral geometry"
+-- UI has filter: topics = GEO-S
+-- $query_vector = await embed("cyclic quadrilateral geometry problems")
 
-const request = {
-  search: "cyclic quadrilateral",                   // BM25 on title + statement
-  vectorQueries: [{
-    vector: await embed("cyclic quadrilateral geometry problems"),
-    kNearestNeighborsCount: 50,
-    fields: "statement_vector",
-  }],
-  filter: "topics/any(t: t eq 'GEO-S')",           // structured filter
-  queryType: "semantic",
-  semanticConfiguration: "default-semantic",
-  top: 20,
-};
-
-// Returns problems tagged GEO-S whose statements mention cyclic quadrilaterals
-// or are semantically similar (e.g., problems about inscribed polygons, Ptolemy)
+WITH text_results AS (
+  SELECT p.id, ts_rank(p.search_tsv, q) AS text_score,
+         ROW_NUMBER() OVER (ORDER BY ts_rank(p.search_tsv, q) DESC) AS text_rank
+  FROM problems p, plainto_tsquery('english', 'cyclic quadrilateral') q
+  WHERE p.search_tsv @@ q
+  LIMIT 50
+),
+vector_results AS (
+  SELECT p.id, 1 - (p.statement_vector <=> $query_vector) AS vector_score,
+         ROW_NUMBER() OVER (ORDER BY p.statement_vector <=> $query_vector) AS vector_rank
+  FROM problems p
+  ORDER BY p.statement_vector <=> $query_vector
+  LIMIT 50
+),
+rrf AS (
+  SELECT COALESCE(t.id, v.id) AS id,
+         COALESCE(1.0 / (60 + t.text_rank), 0) +
+         COALESCE(1.0 / (60 + v.vector_rank), 0) AS rrf_score
+  FROM text_results t FULL OUTER JOIN vector_results v ON t.id = v.id
+)
+SELECT p.*, rrf.rrf_score
+FROM rrf JOIN problems p ON rrf.id = p.id
+-- Structured filter: only GEO-S problems
+WHERE EXISTS (
+  SELECT 1 FROM problem_topics pt JOIN topics t ON pt.topic_id = t.id
+  WHERE pt.problem_id = p.id AND t.code = 'GEO-S'
+)
+ORDER BY rrf.rrf_score DESC
+LIMIT 20;
 ```
 
 **What each search mode contributes:**
-- **BM25:** Finds problems with "cyclic quadrilateral" in the statement
-- **Vector:** Also finds problems about "inscribed quadrilaterals in a circle"
+- **tsvector:** Finds problems with "cyclic quadrilateral" in the statement
+- **pgvector:** Also finds problems about "inscribed quadrilaterals in a circle"
   or "Ptolemy's inequality" (semantically related, different wording)
-- **Filter:** Excludes analytic geometry (GEO-A) and non-geometry problems
+- **SQL filter:** Excludes analytic geometry (GEO-A) and non-geometry problems
 
 #### Example 2: "Find problems similar to this one"
 
-```typescript
-// User clicks "Find similar" on problem prob-abc-123
-// System reads the problem's statement and embeds it
+```sql
+-- User clicks "Find similar" on problem prob-abc-123
+-- System reads the problem's embedding directly from PostgreSQL
 
-const sourceProblem = await db.query(
-  "SELECT statement FROM problems WHERE id = $1", ["prob-abc-123"]
-);
-
-const request = {
-  search: "",                                       // no text search
-  vectorQueries: [{
-    vector: await embed(sourceProblem.statement),   // embed the source problem
-    kNearestNeighborsCount: 20,
-    fields: "statement_vector",
-  }],
-  filter: "id ne 'prob-abc-123'",                   // exclude the source problem
-  top: 10,
-};
-
-// Returns problems with the most similar mathematical content,
-// regardless of how they're tagged — pure semantic similarity
+SELECT p.id, p.title, p.statement,
+       1 - (p.statement_vector <=> source.statement_vector) AS similarity
+FROM problems p,
+     (SELECT statement_vector FROM problems WHERE id = 'prob-abc-123') source
+WHERE p.id != 'prob-abc-123'
+ORDER BY p.statement_vector <=> source.statement_vector
+LIMIT 10;
 ```
 
 **Why vector-only works here:** "Similar" means mathematically related structure,
 not keyword overlap. Two problems about the same concept may use completely
-different phrasing. Vector similarity captures this better than BM25.
+different phrasing. Vector similarity captures this better than full-text.
 
-**Post-processing:** The API also checks `problem_relationships` in PostgreSQL
-for curated similar/variant links (stored via ProblemRelationship entity) and
-merges those results with the vector search results, deduplicating by ID.
+**Advantage over the previous AI Search design:** The source problem's embedding
+is already stored in PostgreSQL — no need to re-embed it. The query is a single
+SQL statement with no external API call.
+
+**Post-processing:** The API also checks `problem_relationships` for curated
+similar/variant links (stored via ProblemRelationship entity) and merges those
+results with the vector search results, deduplicating by ID.
 
 #### Example 3: "Find beginner-friendly invariant problems"
 
-```typescript
-// User types: "invariant problems for beginners"
-// System interprets: GAME domain + foundational level
+```sql
+-- User types: "invariant problems for beginners"
+-- System applies taxonomy-driven filters
+-- $query_vector = await embed("beginner friendly invariant parity problems")
 
-const request = {
-  search: "invariant",                              // keyword
-  vectorQueries: [{
-    vector: await embed("beginner friendly invariant parity problems"),
-    kNearestNeighborsCount: 50,
-    fields: "statement_vector",
-  }],
-  filter: [
-    "techniques/any(t: t eq 'T-PARITY' or t eq 'T-COLOURING' or t eq 'T-MODINV')",
-    "competition_level eq 'local' or competition_level eq 'state'",
-    "entry_barrier eq 'transparent'",
-  ].join(" and "),
-  queryType: "semantic",
-  top: 15,
-};
-
-// Returns local/state level problems that use parity, colouring, or modular
-// invariants, with transparent entry barriers — ideal for a student starting
-// with invariant reasoning
+SELECT p.id, p.title, p.statement, p.competition_level, p.entry_barrier,
+       1 - (p.statement_vector <=> $query_vector) AS similarity
+FROM problems p
+WHERE p.competition_level IN ('local', 'state')
+  AND p.entry_barrier = 'transparent'
+  AND EXISTS (
+    SELECT 1 FROM problem_techniques pt JOIN techniques t ON pt.technique_id = t.id
+    WHERE pt.problem_id = p.id AND t.code IN ('T-PARITY', 'T-COLOURING', 'T-MODINV')
+  )
+  AND p.search_tsv @@ plainto_tsquery('english', 'invariant')
+ORDER BY p.statement_vector <=> $query_vector
+LIMIT 15;
 ```
 
 **How taxonomy makes this work:**
@@ -755,22 +794,39 @@ const request = {
 // Chat message: "Give me 6 number theory problems for a 2-hour session,
 //                mix of modular arithmetic and divisibility, state level"
 
-// Step 1: RETRIEVE — search for candidate problems
-const candidates = await searchClient.search({
-  search: "number theory modular arithmetic divisibility",
-  vectorQueries: [{
-    vector: await embed("number theory modular arithmetic divisibility practice"),
-    kNearestNeighborsCount: 50,
-    fields: "statement_vector",
-  }],
-  filter: [
-    "topics/any(t: t eq 'NT')",
-    "subtopics/any(s: s eq 'NT-MOD' or s eq 'NT-MOD-BAS' or s eq 'NT-DIV')",
-    "competition_level eq 'state'",
-  ].join(" and "),
-  queryType: "semantic",
-  top: 20,                                          // retrieve 20, let LLM pick 6
-});
+// Step 1: RETRIEVE — hybrid search via PostgreSQL
+const queryVector = await embed("number theory modular arithmetic divisibility practice");
+
+const candidates = await db.query(`
+  WITH text_results AS (
+    SELECT p.id, ts_rank(p.search_tsv, q) AS text_score,
+           ROW_NUMBER() OVER (ORDER BY ts_rank(p.search_tsv, q) DESC) AS text_rank
+    FROM problems p, plainto_tsquery('english', 'number theory modular arithmetic divisibility') q
+    WHERE p.search_tsv @@ q
+    LIMIT 50
+  ),
+  vector_results AS (
+    SELECT p.id, ROW_NUMBER() OVER (ORDER BY p.statement_vector <=> $1) AS vector_rank
+    FROM problems p
+    ORDER BY p.statement_vector <=> $1
+    LIMIT 50
+  ),
+  rrf AS (
+    SELECT COALESCE(t.id, v.id) AS id,
+           COALESCE(1.0 / (60 + t.text_rank), 0) +
+           COALESCE(1.0 / (60 + v.vector_rank), 0) AS rrf_score
+    FROM text_results t FULL OUTER JOIN vector_results v ON t.id = v.id
+  )
+  SELECT p.id, p.title, p.statement, p.competition_level, rrf.rrf_score
+  FROM rrf JOIN problems p ON rrf.id = p.id
+  WHERE p.competition_level = 'state'
+    AND EXISTS (SELECT 1 FROM problem_topics pt JOIN topics t ON pt.topic_id = t.id
+                WHERE pt.problem_id = p.id AND t.code = 'NT')
+    AND EXISTS (SELECT 1 FROM problem_subtopics ps JOIN subtopics s ON ps.subtopic_id = s.id
+                WHERE ps.problem_id = p.id AND s.code IN ('NT-MOD', 'NT-MOD-BAS', 'NT-DIV'))
+  ORDER BY rrf.rrf_score DESC
+  LIMIT 20
+`, [queryVector]);
 
 // Step 2: GENERATE — LLM selects and sequences
 const response = await openai.chat.completions.create({
@@ -790,7 +846,7 @@ Retrieved problems: ${JSON.stringify(candidates)}` },
 
 **Key design point:** The search layer retrieves a broad candidate set (20
 problems). The LLM in the chat layer curates and sequences — it doesn't search
-the index directly. This separation keeps search deterministic and cheap.
+the database directly. This separation keeps search deterministic and cheap.
 
 ---
 
@@ -821,83 +877,105 @@ GET /api/search?q={query}&topics={topic_codes}&level={competition_level}&...
 
 ### 8.3 Query Construction
 
-The Search API builds a hybrid query from the parameters:
+The Search API builds a hybrid SQL query from the parameters. Because search
+and data live in the same PostgreSQL database, there is no separate enrichment
+step — the query returns full problem data in a single round-trip.
 
 ```typescript
-async function buildSearchQuery(params: SearchParams): Promise<SearchRequest> {
-  // 1. Build OData filter from structured params
-  const filters: string[] = [];
-  if (params.topics)
-    filters.push(params.topics.map(t => `topics/any(x: x eq '${t}')`).join(' or '));
-  if (params.level)
-    filters.push(`competition_level eq '${params.level}'`);
-  if (params.proof_style)
-    filters.push(`proof_style eq '${params.proof_style}'`);
-  if (params.competition)
-    filters.push(`source_competition eq '${params.competition}'`);
-  if (params.year_min)
-    filters.push(`source_year ge ${params.year_min}`);
-  if (params.year_max)
-    filters.push(`source_year le ${params.year_max}`);
-
-  // 2. Embed the query text for vector search
+async function executeSearch(params: SearchParams): Promise<ProblemCard[]> {
+  // 1. Embed the query text for vector search
   const queryVector = await embed(params.q);
 
-  // 3. Build hybrid request (text + vector + filters)
-  return {
-    search: params.q,                          // BM25 full-text
-    vectorQueries: [{
-      vector: queryVector,
-      kNearestNeighborsCount: 50,
-      fields: "statement_vector",
-    }],
-    filter: filters.join(' and '),
-    queryType: "semantic",
-    semanticConfiguration: "default-semantic",
-    top: params.page_size,
-    skip: (params.page - 1) * params.page_size,
-    select: "id,title,statement,source_competition,source_year,competition_level,topics,subtopics,techniques,proof_style,creativity_demand,technique_depth",
-  };
-}
-```
+  // 2. Build SQL with dynamic WHERE clauses
+  const conditions: string[] = [];
+  const values: any[] = [queryVector, params.q];
+  let paramIdx = 3;
 
-### 8.4 Response Enrichment
+  if (params.topics) {
+    conditions.push(`EXISTS (SELECT 1 FROM problem_topics pt JOIN topics t ON pt.topic_id = t.id
+      WHERE pt.problem_id = p.id AND t.code = ANY($${paramIdx}))`);
+    values.push(params.topics);
+    paramIdx++;
+  }
+  if (params.level) {
+    conditions.push(`p.competition_level = $${paramIdx}`);
+    values.push(params.level);
+    paramIdx++;
+  }
+  if (params.proof_style) {
+    conditions.push(`p.proof_style = $${paramIdx}`);
+    values.push(params.proof_style);
+    paramIdx++;
+  }
+  if (params.year_min) {
+    conditions.push(`p.source_year >= $${paramIdx}`);
+    values.push(params.year_min);
+    paramIdx++;
+  }
+  if (params.year_max) {
+    conditions.push(`p.source_year <= $${paramIdx}`);
+    values.push(params.year_max);
+    paramIdx++;
+  }
 
-AI Search returns search-optimised documents. The API enriches results from
-PostgreSQL before returning to the frontend:
+  const whereClause = conditions.length > 0
+    ? 'WHERE ' + conditions.join(' AND ')
+    : '';
 
-```typescript
-async function enrichResults(searchResults: SearchResult[]): Promise<ProblemCard[]> {
-  const ids = searchResults.map(r => r.id);
-
-  // Single query: get full LaTeX statements + solutions + technique names
-  const enriched = await db.query(`
-    SELECT
-      p.id, p.title, p.statement, p.answer,
-      p.source_year, p.source_round, p.language,
-      c.abbreviation AS competition,
-      json_agg(DISTINCT jsonb_build_object(
-        'code', t.code, 'name', t.name, 'cognitive_load', t.cognitive_load
-      )) AS techniques,
-      json_agg(DISTINCT jsonb_build_object(
-        'code', top.code, 'name', top.name
-      )) AS topics
-    FROM problems p
+  // 3. Execute hybrid search (tsvector + pgvector + RRF)
+  const result = await db.query(`
+    WITH text_results AS (
+      SELECT p.id, ts_rank(p.search_tsv, q) AS text_score,
+             ROW_NUMBER() OVER (ORDER BY ts_rank(p.search_tsv, q) DESC) AS text_rank
+      FROM problems p, plainto_tsquery('english', $2) q
+      WHERE p.search_tsv @@ q
+      LIMIT 50
+    ),
+    vector_results AS (
+      SELECT p.id,
+             ROW_NUMBER() OVER (ORDER BY p.statement_vector <=> $1) AS vector_rank
+      FROM problems p
+      ORDER BY p.statement_vector <=> $1
+      LIMIT 50
+    ),
+    rrf AS (
+      SELECT COALESCE(t.id, v.id) AS id,
+             COALESCE(1.0 / (60 + t.text_rank), 0) +
+             COALESCE(1.0 / (60 + v.vector_rank), 0) AS rrf_score
+      FROM text_results t FULL OUTER JOIN vector_results v ON t.id = v.id
+    )
+    SELECT p.id, p.title, p.statement, p.answer,
+           p.source_year, p.source_round, p.language,
+           p.competition_level, p.proof_style,
+           p.creativity_demand, p.technique_depth, p.entry_barrier,
+           c.abbreviation AS competition,
+           rrf.rrf_score AS search_score,
+           json_agg(DISTINCT jsonb_build_object(
+             'code', tech.code, 'name', tech.name, 'cognitive_load', tech.cognitive_load
+           )) AS techniques,
+           json_agg(DISTINCT jsonb_build_object(
+             'code', top.code, 'name', top.name
+           )) AS topics
+    FROM rrf
+    JOIN problems p ON rrf.id = p.id
     LEFT JOIN competitions c ON p.source_competition_id = c.id
     LEFT JOIN problem_techniques pt ON p.id = pt.problem_id
-    LEFT JOIN techniques t ON pt.technique_id = t.id
+    LEFT JOIN techniques tech ON pt.technique_id = tech.id
     LEFT JOIN problem_topics ptop ON p.id = ptop.problem_id
     LEFT JOIN topics top ON ptop.topic_id = top.id
-    WHERE p.id = ANY($1)
-    GROUP BY p.id, c.abbreviation
-  `, [ids]);
+    ${whereClause}
+    GROUP BY p.id, c.abbreviation, rrf.rrf_score
+    ORDER BY rrf.rrf_score DESC
+    LIMIT ${params.page_size} OFFSET ${(params.page - 1) * params.page_size}
+  `, values);
 
-  return enriched.map(row => ({
-    ...row,
-    search_score: searchResults.find(r => r.id === row.id)?.score,
-  }));
+  return result.rows;
 }
 ```
+
+**Key advantage over the previous dual-store design:** No enrichment step needed.
+Search and data live in the same database, so the query returns full problem data
+(LaTeX statements, solutions, technique names) in a single SQL round-trip.
 
 ### 8.5 Response Shape
 
@@ -961,14 +1039,13 @@ async function retrieveProblems(message: string, filters?: Filters): Promise<Pro
   // 1. Embed the user message
   const queryVector = await embed(message);
 
-  // 2. Search with optional filters
-  const results = await searchClient.search({
-    search: message,
-    vectorQueries: [{ vector: queryVector, kNearestNeighborsCount: 20, fields: "statement_vector" }],
-    filter: buildFilterString(filters),
-    queryType: "semantic",
-    top: 10,
-    select: "id,title,statement,source_competition,source_year,topics,subtopics,techniques,competition_level,proof_style",
+  // 2. Hybrid search via PostgreSQL (reuses the same search logic from §8.3)
+  const results = await executeSearch({
+    q: message,
+    topics: filters?.topics,
+    level: filters?.level,
+    page: 1,
+    page_size: 10,
   });
 
   return results;
@@ -1048,8 +1125,7 @@ Statement: ${p.statement}
 | Store raw snapshots | Blob Storage | ~$0.01 |
 | AI classification (12,000 problems, Batch API) | GPT-4o-mini (input: 30M tok, output: 2.4M tok) | ~$3.00 |
 | Embedding generation (12,000 × ~200 tok) | text-embedding-3-small | ~$0.05 |
-| PostgreSQL writes | Included in monthly cost | $0 incremental |
-| AI Search indexing | Included in monthly cost | $0 incremental |
+| PostgreSQL writes (+ vector column) | Included in monthly cost | $0 incremental |
 | **Total one-time import cost** | | **~$3.06** |
 
 This is **one-time** — the cost of importing the initial corpus. Subsequent
@@ -1062,17 +1138,16 @@ problems (dedup-filtered) incur classification costs.
 
 | Step | What | Depends On | Effort |
 |------|------|------------|--------|
-| 1 | PostgreSQL schema (domain model tables + import_records) | — | 3–4 days |
+| 1 | PostgreSQL schema (domain model tables + pgvector + tsvector + import_records) | — | 3–4 days |
 | 2 | Seed taxonomy reference data (topics, subtopics, techniques, competitions) | Step 1 | 2 days |
-| 3 | AI Search index creation | — | 1 day |
-| 4 | Source adapters (Omni-MATH first, then others) | Step 1 | 3–4 days |
-| 5 | LaTeX normalisation + dedup module | — | 2 days |
-| 6 | AI classification function + prompt engineering | Step 2 | 3–5 days |
-| 7 | Store function (PostgreSQL + AI Search writes) | Steps 1, 3 | 2 days |
-| 8 | Run full import pipeline | Steps 4–7 | 1 day |
-| 9 | Search API | Steps 1, 3, 8 | 3–4 days |
-| 10 | Chat API (RAG) | Steps 8, 9 | 3–4 days |
-| 11 | React UI (search + chat + problem cards) | Steps 9, 10 | 2–3 weeks |
+| 3 | Source adapters (Omni-MATH first, then others) | Step 1 | 3–4 days |
+| 4 | LaTeX normalisation + dedup module | — | 2 days |
+| 5 | AI classification function + prompt engineering | Step 2 | 3–5 days |
+| 6 | Store function (PostgreSQL write with embedding) | Step 1 | 1–2 days |
+| 7 | Run full import pipeline | Steps 3–6 | 1 day |
+| 8 | Search API (hybrid: tsvector + pgvector + SQL filters) | Steps 1, 7 | 3–4 days |
+| 9 | Chat API (RAG) | Steps 7, 8 | 3–4 days |
+| 10 | React UI (search + chat + problem cards) | Steps 8, 9 | 2–3 weeks |
 | **Total** | | | **6–8 weeks** |
 
 ---
@@ -1091,9 +1166,8 @@ block the rest of the import batch.
 | **Dedup collision** | SHA-256 hash already in `import_records` | Skip silently, log as `duplicate` |
 | **Classification failure** | GPT-4o-mini returns invalid JSON or codes not in taxonomy | Retry once with correction prompt; if still invalid, store problem with `status: draft` and empty classification (flag for manual review) |
 | **Classification timeout** | Batch API exceeds 24h or individual call hangs | Retry the batch; problems already stored are idempotent via dedup hash |
-| **Embedding failure** | OpenAI API error | Retry with exponential backoff (3 attempts); if still failing, store in PostgreSQL without AI Search entry (add to search index later) |
+| **Embedding failure** | OpenAI API error | Retry with exponential backoff (3 attempts); if still failing, store in PostgreSQL without embedding (vector search won't find it, but text search and filters will) |
 | **PostgreSQL write failure** | Constraint violation, connection error | Rollback transaction, log full error, add to dead-letter queue for manual inspection |
-| **AI Search write failure** | Index unavailable or quota exceeded | Store in PostgreSQL (source of truth); queue for AI Search retry |
 
 ### 12.2 Batch-Level Tracking
 
@@ -1170,14 +1244,13 @@ mathpilot/
 │   │   │   │   ├── prompts.ts        # System + user prompt templates
 │   │   │   │   └── validate.ts       # Post-classification validation rules
 │   │   │   ├── store/
-│   │   │   │   ├── postgres.ts       # PostgreSQL write logic
-│   │   │   │   └── search-index.ts   # AI Search document push
+│   │   │   │   └── postgres.ts       # PostgreSQL write logic (+ embedding)
 │   │   │   └── run-import.ts         # Orchestrator: fetch → normalise → classify → store
 │   │   │
 │   │   └── shared/
-│   │       ├── db.ts                 # PostgreSQL connection pool
+│   │       ├── db.ts                 # PostgreSQL connection pool (+ pgvector)
 │   │       ├── openai.ts             # Azure OpenAI client
-│   │       └── search.ts             # AI Search client
+│   │       └── search.ts             # Hybrid search query builder (tsvector + pgvector)
 │   │
 │   ├── host.json
 │   ├── package.json
@@ -1237,7 +1310,7 @@ mathpilot/
 
 | # | Question | Decision Needed By |
 |---|----------|--------------------|
-| 1 | Should we start with AI Search **Free tier** (no vector search) and upgrade to Basic later? Saves $75/month but loses semantic search. | Before Step 3 |
+| 1 | ~~Should we start with AI Search Free tier?~~ **Resolved:** Using pgvector in PostgreSQL instead of AI Search. No separate search service needed. | ✅ Resolved |
 | 2 | Should the import pipeline run as a one-shot script or as Azure Functions? Script is simpler for a one-time import. | Before Step 4 |
 | 3 | How compressed should the taxonomy reference be in the classification prompt? Need to balance accuracy vs. token cost. | Before Step 6 |
 | 4 | Should NuminaMath's `olympiads` subset be filtered further? 50k problems may include non-olympiad competition math. | Before Step 8 |

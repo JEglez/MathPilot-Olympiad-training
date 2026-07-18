@@ -17,7 +17,7 @@ in `01-product-analysis.md` §7:
 | AI at ingestion, not at runtime | LLM calls happen in the async ingestion pipeline, not in the search/browse hot path |
 | Pre-compute everything possible | Embeddings and classifications are stored; search uses pre-indexed data |
 | Use the cheapest model that works | GPT-4o-mini for extraction/classification; text-embedding-3-small for vectors |
-| Prefer consumption-based pricing | Azure Functions Consumption plan; AI Search Free tier (upgrade to Basic when validated); no always-on servers |
+| Prefer consumption-based pricing | Azure Functions Consumption plan; PostgreSQL + pgvector for search (no separate search service); no always-on servers |
 | No Cosmos DB | PostgreSQL Flexible Server (Burstable B1ms) for the entity model |
 | Scale with problems, not users | Ingestion cost grows with corpus; serving cost stays near-zero |
 
@@ -65,25 +65,22 @@ removes a core MVP feature.
 └─────────┼──────────────────────────────────────────────────┼───────────┘
           │                                                  │
           ▼                                                  ▼
-┌──────────────────┐  ┌───────────────────┐  ┌──────────────────────────┐
-│  Azure Blob      │  │  PostgreSQL       │  │  Azure OpenAI            │
-│  Storage         │  │  Flexible Server  │  │                          │
-│                  │  │  (Burstable B1ms) │  │  • GPT-4o-mini (chat,    │
-│  • PDF uploads   │  │                   │  │    extraction,           │
-│  • Static assets │  │  • Problems       │  │    classification)       │
-│                  │  │  • Topics         │  │  • text-embedding-3-small│
-└──────────────────┘  │  • Techniques     │  │    (embeddings)          │
-                      │  • Solutions      │  │                          │
-                      │  • Competitions   │  └──────────────────────────┘
-                      │  • Translations   │
-                      │  • Join tables    │  ┌──────────────────────────┐
-                      └───────┬───────────┘  │  Azure AI Search         │
-                              │              │  (Basic tier)            │
-                              │ sync         │                          │
-                              └─────────────▶│  • Problem index         │
-                                             │    (structured fields +  │
-                                             │     vector embeddings)   │
-                                             └──────────────────────────┘
+┌──────────────────┐  ┌───────────────────────────┐  ┌──────────────────────────┐
+│  Azure Blob      │  │  PostgreSQL               │  │  Azure OpenAI            │
+│  Storage         │  │  Flexible Server          │  │                          │
+│                  │  │  (Burstable B1ms)         │  │  • GPT-4o-mini (chat,    │
+│  • PDF uploads   │  │  + pgvector extension     │  │    extraction,           │
+│  • Static assets │  │                           │  │    classification)       │
+│                  │  │  • Problems               │  │  • text-embedding-3-small│
+└──────────────────┘  │  • Topics                 │  │    (embeddings)          │
+                      │  • Techniques             │  │                          │
+                      │  • Solutions              │  └──────────────────────────┘
+                      │  • Competitions           │
+                      │  • Translations           │
+                      │  • Join tables            │
+                      │  • statement_vector (1536) │  ← pgvector column
+                      │  • tsvector full-text idx  │  ← PostgreSQL FTS
+                      └───────────────────────────┘
 ```
 
 ---
@@ -117,8 +114,8 @@ Five function groups, all in a single Function App:
 | `ingest-pipeline` | Blob trigger | Extracts, classifies, embeds, stores problems from PDF | **Yes** (ingestion-time) |
 | `import-dataset` | HTTP POST (manual) | Imports from HF/GitHub datasets (Omni-MATH, etc.) | **Yes** (ingestion-time, Batch API) |
 | `browse-problems` | HTTP GET | Paginated queries against PostgreSQL | No |
-| `search-problems` | HTTP GET | Queries AI Search (structured + semantic) | No |
-| `chat-problems` | HTTP POST | RAG: retrieve from AI Search → generate with LLM | **Yes** (runtime — justified) |
+| `search-problems` | HTTP GET | Hybrid search via PostgreSQL (tsvector + pgvector + filters) | No |
+| `chat-problems` | HTTP POST | RAG: retrieve from PostgreSQL → generate with LLM | **Yes** (runtime — justified) |
 
 > **Dataset import details:** See `03-dataset-import-search.md` §5 for source
 > adapters, normalisation, and the full import pipeline.
@@ -154,53 +151,64 @@ features (see `01-product-analysis.md` §5).
 **Why PostgreSQL over Azure SQL?**
 - Flexible Server B1ms: ~$13/month (1 vCore, 2 GB RAM, 32 GB storage)
 - Azure SQL Basic: ~$5/month but limited to 2 GB database, 5 DTUs
-- PostgreSQL is more natural for JSONB fields (hint sequences on solutions),
-  array columns (FK arrays), and full-text search as a fallback
+- PostgreSQL supports **pgvector** extension for vector similarity search,
+  eliminating the need for a separate search service (Azure AI Search)
+- PostgreSQL built-in `tsvector` provides full-text search with ranking
+- JSONB fields, array columns, and full-text search all in one service
+- **One database for everything:** relational data, vector search, full-text
+  search — no dual-write, no sync issues
 
-**Data sync to AI Search:** After the ingestion pipeline writes a problem to
-PostgreSQL, it also pushes a flattened document to the AI Search index. This is
-a simple write-after-write pattern, not a change-feed sync.
+### 3.5 PostgreSQL pgvector + Full-Text Search
 
-### 3.5 Azure AI Search (Free Tier → Basic Tier)
+All search capabilities live inside PostgreSQL — no separate search service.
 
-> **Launch on Free tier.** The taxonomy provides rich structured filters that
-> cover most search scenarios without vector/semantic search. Upgrade to Basic
-> when real trainer feedback validates the need. See §6 for tier strategy.
+**pgvector extension:** Adds a `vector(1536)` column type and cosine similarity
+operator (`<=>`) with HNSW indexing for fast approximate nearest neighbor search.
+Azure Database for PostgreSQL Flexible Server supports pgvector natively.
 
-A single index `problems` with structured fields + vector field:
+**Full-text search:** PostgreSQL's built-in `tsvector` + `tsquery` with the
+English dictionary provides keyword search with stemming and ranking (`ts_rank`).
 
-| Field | Type | Source |
-|-------|------|--------|
-| `id` | string (key) | Problem.id |
-| `title` | searchable string | Problem.title |
-| `statement` | searchable string | Problem.statement (plain text, no LaTeX) |
-| `source_competition` | filterable string | Competition.abbreviation |
-| `source_year` | filterable int | Problem.source_year |
-| `competition_level` | filterable string | Problem.competition_level enum |
-| `topics` | filterable string[] | Topic.code via join |
-| `subtopics` | filterable string[] | Subtopic.code via join |
-| `techniques` | filterable string[] | Technique.code via join |
-| `proof_style` | filterable string | Problem.proof_style enum |
-| `creativity_demand` | filterable string | Problem.creativity_demand enum |
-| `technique_depth` | filterable string | Problem.technique_depth enum |
-| `entry_barrier` | filterable string | Problem.entry_barrier enum |
-| `language` | filterable string | Problem.language |
-| `statement_vector` | vector (1536-dim) | text-embedding-3-small output |
+| Search Mode | Implementation | Example |
+|-------------|---------------|---------|
+| Structured filter | SQL `WHERE` + `JOIN` on taxonomy tables | `WHERE topic_code = 'NT' AND competition_level = 'state'` |
+| Full-text | `tsvector @@ tsquery` on statement + title | `to_tsquery('english', 'pigeonhole & divisibility')` |
+| Semantic (vector) | `ORDER BY statement_vector <=> $query_vector` | Embed query → find cosine-similar problems |
+| Hybrid | Full-text + vector scores combined with RRF | Default for search bar queries |
 
-**Search modes:**
+**Schema additions to the `problems` table:**
 
-| Mode | How It Works | Example |
-|------|-------------|---------|
-| Structured filter | Filter on faceted fields | `topics eq 'NT' AND competition_level eq 'state'` |
-| Full-text | BM25 on title + statement | `"pigeonhole divisibility"` |
-| Semantic (vector) | Cosine similarity on statement_vector | `"problems about partitioning integers into groups"` |
-| Hybrid | Full-text + vector, RRF fusion | Default for search bar queries |
+```sql
+-- Enable pgvector
+CREATE EXTENSION IF NOT EXISTS vector;
 
-**Cost:** Free tier supports 50 MB index limit (12k problems ≈ 15 MB — fits).
-Basic tier (~$75/month) adds vector search, semantic reranking, up to 2 GB indexes.
-For 500 problems this is vast overkill — but Basic is the minimum tier that
-supports semantic ranking. If cost is prohibitive at launch, start with **Free
-tier** (50 MB, no semantic ranking) and use structured + full-text only.
+-- Add vector column for embeddings
+ALTER TABLE problems ADD COLUMN statement_vector vector(1536);
+
+-- Add tsvector column for full-text search
+ALTER TABLE problems ADD COLUMN search_tsv tsvector
+  GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(statement_plain, '')), 'B')
+  ) STORED;
+
+-- Indexes
+CREATE INDEX idx_problems_vector ON problems
+  USING hnsw (statement_vector vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
+
+CREATE INDEX idx_problems_search ON problems USING gin (search_tsv);
+```
+
+**Why this replaces Azure AI Search:**
+- 12k problems × 1536 floats × 4 bytes ≈ 73 MB — fits comfortably in B1ms
+- HNSW index on pgvector provides sub-100ms vector search at this scale
+- Full-text with `ts_rank` is adequate for keyword search (not as polished as
+  BM25 with language-specific analyzers, but sufficient for math content)
+- **$0/month additional cost** — search runs on the same PostgreSQL instance
+- Eliminates dual-write complexity (no sync issues between two data stores)
+- If search quality needs improve later, Azure AI Search can be added as an
+  upgrade path without changing the data model
 
 ### 3.6 Azure OpenAI
 
@@ -253,69 +261,66 @@ Trainer                React SPA               Upload API             Blob Stora
 ### 4.2 Extract & Classify Problems (Async Ingestion Pipeline)
 
 ```
-Blob Storage          Ingest Pipeline          Azure OpenAI           PostgreSQL       AI Search
-     │                     │                       │                     │                │
-     │  blob trigger       │                       │                     │                │
-     │  (new PDF)          │                       │                     │                │
-     │────────────────────▶│                       │                     │                │
-     │                     │                       │                     │                │
-     │                     │  UPDATE ingestion_job │                     │                │
-     │                     │  status: 'extracting' │                     │                │
-     │                     │────────────────────────────────────────────▶│                │
-     │                     │                       │                     │                │
-     │                     │  ── STEP 1: EXTRACT ──│                     │                │
-     │                     │                       │                     │                │
-     │                     │  Extract PDF text     │                     │                │
-     │                     │  (pdf-parse library)  │                     │                │
-     │                     │                       │                     │                │
-     │                     │  Send text chunks to  │                     │                │
-     │                     │  GPT-4o-mini:         │                     │                │
-     │                     │  "Split into separate │                     │                │
-     │                     │   olympiad problems.  │                     │                │
-     │                     │   Return JSON array." │                     │                │
-     │                     │──────────────────────▶│                     │                │
-     │                     │                       │                     │                │
-     │                     │  [{ title, statement, │                     │                │
-     │                     │    source, year }]    │                     │                │
-     │                     │◀──────────────────────│                     │                │
-     │                     │                       │                     │                │
-     │                     │  ── STEP 2: CLASSIFY ─│ (per problem)       │                │
-     │                     │                       │                     │                │
-     │                     │  Send problem +       │                     │                │
-     │                     │  taxonomy reference   │                     │                │
-     │                     │  to GPT-4o-mini:      │                     │                │
-     │                     │  "Classify using these│                     │                │
-     │                     │   codes. Return JSON."│                     │                │
-     │                     │──────────────────────▶│                     │                │
-     │                     │                       │                     │                │
-     │                     │  { topics, subtopics, │                     │                │
-     │                     │    techniques,        │                     │                │
-     │                     │    competition_level,  │                     │                │
-     │                     │    proof_style, ... }  │                     │                │
-     │                     │◀──────────────────────│                     │                │
-     │                     │                       │                     │                │
-     │                     │  ── STEP 3: EMBED ────│                     │                │
-     │                     │                       │                     │                │
-     │                     │  Send statement to    │                     │                │
-     │                     │  text-embedding-3-small│                    │                │
-     │                     │──────────────────────▶│                     │                │
-     │                     │  [0.012, -0.034, ...] │                     │                │
-     │                     │◀──────────────────────│                     │                │
-     │                     │                       │                     │                │
-     │                     │  ── STEP 4: STORE ────│                     │                │
-     │                     │                       │                     │                │
-     │                     │  INSERT problem +     │                     │                │
-     │                     │  join table rows      │                     │                │
-     │                     │────────────────────────────────────────────▶│                │
-     │                     │                       │                     │                │
-     │                     │  PUSH flattened doc   │                     │                │
-     │                     │  to AI Search index   │                     │                │
-     │                     │─────────────────────────────────────────────────────────────▶│
-     │                     │                       │                     │                │
-     │                     │  UPDATE ingestion_job │                     │                │
-     │                     │  status: 'completed'  │                     │                │
-     │                     │  problems_extracted: N│                     │                │
-     │                     │────────────────────────────────────────────▶│                │
+Blob Storage          Ingest Pipeline          Azure OpenAI           PostgreSQL
+     │                     │                       │                     │
+     │  blob trigger       │                       │                     │
+     │  (new PDF)          │                       │                     │
+     │────────────────────▶│                       │                     │
+     │                     │                       │                     │
+     │                     │  UPDATE ingestion_job │                     │
+     │                     │  status: 'extracting' │                     │
+     │                     │────────────────────────────────────────────▶│
+     │                     │                       │                     │
+     │                     │  ── STEP 1: EXTRACT ──│                     │
+     │                     │                       │                     │
+     │                     │  Extract PDF text     │                     │
+     │                     │  (pdf-parse library)  │                     │
+     │                     │                       │                     │
+     │                     │  Send text chunks to  │                     │
+     │                     │  GPT-4o-mini:         │                     │
+     │                     │  "Split into separate │                     │
+     │                     │   olympiad problems.  │                     │
+     │                     │   Return JSON array." │                     │
+     │                     │──────────────────────▶│                     │
+     │                     │                       │                     │
+     │                     │  [{ title, statement, │                     │
+     │                     │    source, year }]    │                     │
+     │                     │◀──────────────────────│                     │
+     │                     │                       │                     │
+     │                     │  ── STEP 2: CLASSIFY ─│ (per problem)       │
+     │                     │                       │                     │
+     │                     │  Send problem +       │                     │
+     │                     │  taxonomy reference   │                     │
+     │                     │  to GPT-4o-mini:      │                     │
+     │                     │  "Classify using these│                     │
+     │                     │   codes. Return JSON."│                     │
+     │                     │──────────────────────▶│                     │
+     │                     │                       │                     │
+     │                     │  { topics, subtopics, │                     │
+     │                     │    techniques,        │                     │
+     │                     │    competition_level,  │                     │
+     │                     │    proof_style, ... }  │                     │
+     │                     │◀──────────────────────│                     │
+     │                     │                       │                     │
+     │                     │  ── STEP 3: EMBED ────│                     │
+     │                     │                       │                     │
+     │                     │  Send statement to    │                     │
+     │                     │  text-embedding-3-small│                    │
+     │                     │──────────────────────▶│                     │
+     │                     │  [0.012, -0.034, ...] │                     │
+     │                     │◀──────────────────────│                     │
+     │                     │                       │                     │
+     │                     │  ── STEP 4: STORE ────│                     │
+     │                     │                       │                     │
+     │                     │  INSERT problem +     │                     │
+     │                     │  join table rows +    │                     │
+     │                     │  statement_vector     │                     │
+     │                     │────────────────────────────────────────────▶│
+     │                     │                       │                     │
+     │                     │  UPDATE ingestion_job │                     │
+     │                     │  status: 'completed'  │                     │
+     │                     │  problems_extracted: N│                     │
+     │                     │────────────────────────────────────────────▶│
 ```
 
 **Problem status after ingestion:** `draft` (as per domain model lifecycle).
@@ -324,7 +329,7 @@ All AI-classified problems require human review before becoming `published`.
 ### 4.3 Search Problems
 
 ```
-Trainer               React SPA              Search API            AI Search
+Trainer               React SPA              Search API            PostgreSQL
   │                       │                       │                    │
   │  types: "pigeonhole   │                       │                    │
   │  number theory state" │                       │                    │
@@ -336,24 +341,21 @@ Trainer               React SPA              Search API            AI Search
   │                       │──────────────────────▶│                    │
   │                       │                       │                    │
   │                       │                       │  Build hybrid query│
-  │                       │                       │  • filters: topics │
-  │                       │                       │    eq 'NT', level  │
-  │                       │                       │    eq 'state'      │
-  │                       │                       │  • text: pigeonhole│
-  │                       │                       │  • vector: embed(q)│
-  │                       │                       │  (embedding cached │
-  │                       │                       │   or computed once)│
+  │                       │                       │  • embed query     │
+  │                       │                       │    via OpenAI      │
+  │                       │                       │  • tsvector match  │
+  │                       │                       │  • pgvector cosine │
+  │                       │                       │  • SQL filters on  │
+  │                       │                       │    taxonomy JOINs  │
+  │                       │                       │  • RRF rank fusion │
   │                       │                       │───────────────────▶│
   │                       │                       │                    │
   │                       │                       │  Ranked results    │
-  │                       │                       │  (RRF fusion)      │
+  │                       │                       │  (full problem     │
+  │                       │                       │   data in one      │
+  │                       │                       │   query — no       │
+  │                       │                       │   enrichment step) │
   │                       │                       │◀───────────────────│
-  │                       │                       │                    │
-  │                       │                       │  Enrich from       │
-  │                       │                       │  PostgreSQL:       │
-  │                       │                       │  full LaTeX,       │
-  │                       │                       │  solutions,        │
-  │                       │                       │  technique names   │
   │                       │                       │                    │
   │                       │  200 [problem cards]  │                    │
   │                       │◀──────────────────────│                    │
@@ -365,10 +367,15 @@ Trainer               React SPA              Search API            AI Search
 `text-embedding-3-small` for the vector component. This is the one runtime
 embedding call. At ~$0.00002 per query, it's negligible.
 
+**Advantage over the previous dual-store design:** Because search and data live
+in the same database, there is no separate enrichment step. The search query
+JOINs directly to solutions, techniques, and competition tables, returning full
+problem data in a single round-trip.
+
 ### 4.4 Chat Over Problems
 
 ```
-Trainer               React SPA               Chat API           AI Search      Azure OpenAI
+Trainer               React SPA               Chat API           PostgreSQL     Azure OpenAI
   │                       │                       │                   │               │
   │  "Find 3 problems     │                       │                   │               │
   │   using inversion     │                       │                   │               │
@@ -383,8 +390,8 @@ Trainer               React SPA               Chat API           AI Search      
   │                       │                       │                   │               │
   │                       │                       │  ── RETRIEVE ──   │               │
   │                       │                       │  Hybrid search    │               │
-  │                       │                       │  for "inversion   │               │
-  │                       │                       │  power of a point"│               │
+  │                       │                       │  (tsvector +      │               │
+  │                       │                       │   pgvector + SQL) │               │
   │                       │                       │──────────────────▶│               │
   │                       │                       │  top 10 problems  │               │
   │                       │                       │◀──────────────────│               │
@@ -461,14 +468,13 @@ Trainer               React SPA              Browse API           PostgreSQL
 | Ingestion pipeline — PDF text extraction | Medium | 1 week | Handling varied PDF formats (scanned vs text, multi-column) |
 | Ingestion pipeline — LLM extraction | Medium–High | 1–2 weeks | Prompt engineering, JSON parsing, error handling, multi-problem PDFs |
 | Ingestion pipeline — LLM classification | Medium–High | 1–2 weeks | Taxonomy-aware prompts, validation against known codes |
-| Ingestion pipeline — embed + store | Low | 2–3 days | Embedding API call, PostgreSQL + AI Search writes |
+| Ingestion pipeline — embed + store | Low | 2–3 days | Embedding API call, PostgreSQL write (single store) |
 | Browse API | Low | 2–3 days | Parameterised SQL queries with pagination |
-| Search API | Medium | 1 week | Hybrid search construction, query embedding, result enrichment |
+| Search API | Medium | 1 week | Hybrid search (tsvector + pgvector + filters), query embedding |
 | Chat API (RAG) | Medium | 1 week | System prompt design, citation extraction, response streaming |
-| PostgreSQL schema + migrations | Medium | 1 week | Domain model tables, indexes, seed data |
-| AI Search index setup | Low | 2–3 days | Index definition, field mappings |
+| PostgreSQL schema + migrations | Medium | 1 week | Domain model tables, pgvector, tsvector, indexes, seed data |
 | Infrastructure (Bicep/Terraform) | Medium | 1 week | All Azure resources, RBAC, connection strings |
-| **Total estimated MVP effort** | | **10–14 weeks** | Solo developer; less with a team |
+| **Total estimated MVP effort** | | **8–12 weeks** | Solo developer; less with a team |
 
 ---
 
@@ -477,38 +483,20 @@ Trainer               React SPA              Browse API           PostgreSQL
 Assumptions: ~12,000 problems indexed, 3–5 active users, ~50 queries/day,
 ~10 chat messages/day.
 
-### Recommended: Start on Free/Low tier, upgrade when validated
-
 | Resource | Recommended SKU | Monthly Cost |
 |----------|----------------|-------------|
 | Azure Static Web Apps | Free | $0 |
 | Azure Functions | Consumption | ~$0 (within free grant) |
 | Azure Blob Storage | Hot, LRS | ~$0.10 |
-| PostgreSQL Flexible Server | Burstable B1ms | ~$13 |
-| Azure AI Search | **Free** (see note below) | $0 |
+| PostgreSQL Flexible Server (+ pgvector) | Burstable B1ms | ~$13 |
 | Azure OpenAI (runtime: chat + query embeddings) | Pay-per-token | ~$0.50/month |
-| **Recommended monthly total** | | **~$14/month** |
+| **Monthly total** | | **~$14/month** |
 
-### AI Search tier strategy
-
-| Phase | Tier | Monthly Cost | What You Get | What You Lose |
-|-------|------|-------------|-------------|--------------|
-| **Launch (recommended)** | Free | $0 | Structured filters + BM25 full-text. 50 MB index (12k problems ≈ 15 MB — fits). | No vector search, no semantic reranking. |
-| **After validation** | Basic | $75 | Add vector search + semantic reranking. | — |
-
-**Why start Free:** The taxonomy provides excellent structured filterability
-(8 domains, 58 subtopics, 160+ techniques, 6 complexity dimensions). With this
-level of tagging, BM25 + structured filters will handle most trainer queries
-well. Vector/semantic search adds value for vague natural-language queries —
-but those are served by the chat API (which uses GPT-4o-mini regardless of
-search tier). Validate with real trainers before spending $75/month.
-
-### Full tier (if semantic search is needed immediately)
-
-| Resource | SKU | Monthly Cost |
-|----------|-----|-------------|
-| Azure AI Search | Basic | +$75 |
-| **Full monthly total** | | **~$89/month** |
+**Why no separate search service:** PostgreSQL with pgvector and tsvector handles
+all search needs (structured filters, full-text, vector similarity) at MVP scale.
+This eliminates Azure AI Search entirely, saving $0–75/month and removing the
+dual-write sync pattern. If search quality needs improve beyond what PostgreSQL
+provides, Azure AI Search can be added later as an upgrade.
 
 ### One-time costs
 
@@ -554,9 +542,9 @@ is designed so they can be added without redesigning the core:
 | **SPA vs SSR** | React SPA (Vite) | No SEO need for MVP; free hosting on Static Web Apps; simpler deployment |
 | **Single Function App** | All functions in one app | Simpler deployment, shared config; split later if cold-start becomes an issue |
 | **Blob trigger vs queue** | Blob trigger for ingestion | Simpler; no need for Azure Queue/Service Bus at MVP scale |
-| **Write-after-write vs change feed** | Direct write to both PostgreSQL and AI Search | Simpler than CDC; acceptable for low-volume ingestion |
+| **pgvector instead of Azure AI Search** | PostgreSQL with pgvector + tsvector | One service instead of two; $0 incremental cost; no dual-write; search, data, and vectors co-located. Upgrade to AI Search later if needed. |
 | **GPT-4o-mini everywhere** | Same model for extraction, classification, chat | Simplifies deployment; one model, one endpoint. Upgrade selectively if quality demands it |
-| **PostgreSQL over Azure SQL** | PostgreSQL Flexible Server | JSONB support, array columns, lower cost for the size needed |
+| **PostgreSQL over Azure SQL** | PostgreSQL Flexible Server | pgvector support, JSONB, array columns, tsvector, lower cost |
 | **No API gateway** | Functions exposed directly | 3–5 users don't need throttling, caching, or API versioning |
 | **No queue between extract and classify** | Sequential steps in one function | Simpler; at MVP scale (2 PDFs/week), parallelism isn't needed |
 
@@ -585,7 +573,7 @@ Infrastructure:
                                         ├── Static Web App
                                         ├── Function App + Storage Account
                                         ├── PostgreSQL Flexible Server
-                                        ├── AI Search Service
+                                        │     (+ pgvector extension enabled)
                                         ├── OpenAI Service
                                         └── Key Vault
 ```
