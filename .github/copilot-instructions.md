@@ -12,68 +12,54 @@ recommendations, and gap analysis for olympiad students and trainers.
 **Tech stack:** TypeScript (strict), React + Vite, Azure Functions,
 PostgreSQL + pgvector, Azure OpenAI, Azure Static Web Apps.
 
-## Architecture Rules — Always Follow
+## Governance Documents
 
-- **Domain layer is pure.** Entities in `src/domain/` have zero external
-  dependencies. No database imports, no HTTP clients, no framework code.
+Read these docs before making design or implementation decisions. Use
+the `view` tool to read any document you need — do NOT guess at rules.
+
+| Document | Path | When to read |
+|----------|------|-------------|
+| **Constitution** | `docs/governance/constitution.md` | Before ANY planning or design decision |
+| **Architecture** | `docs/governance/architecture-principles.md` | When deciding where code belongs or designing components |
+| **Coding Standards** | `docs/governance/coding-standards.md` | When writing or reviewing TypeScript code |
+| **Testing Standards** | `docs/governance/testing-standards.md` | When planning or writing tests |
+| **AI Guidelines** | `docs/governance/ai-guidelines.md` | When working with any AI/LLM/embedding feature |
+| **Domain Model** | `docs/domain-model.md` | When designing entities or database schemas |
+| **Taxonomy** | `docs/taxonomy.md` | When working with problem classification |
+
+## Key Rules (Quick Reference)
+
+These are the most critical rules. For full details, read the governance docs.
+
+### Architecture
+- **Domain layer is pure.** Zero external dependencies in `src/domain/`.
 - **Dependencies point inward.** Infrastructure → Application → Domain.
-  Never reference infrastructure from domain code.
-- **Validate at boundaries.** Use Zod schemas to validate all external input
-  (API requests, AI responses, file uploads) before it enters the domain.
-- **AI services are adapters.** Wrap all LLM/embedding calls behind domain
-  interfaces (`ProblemClassifier`, `EmbeddingGenerator`). Never call
-  Azure OpenAI directly from application or domain code.
+- **Validate at boundaries.** Zod schemas for all external input.
+- **AI services are adapters.** Wrap behind domain interfaces.
 
-## TypeScript Rules
+### TypeScript
+- No `any`, no `as` assertions, no `@ts-ignore`, no `!` non-null assertions.
+- Use discriminated unions for states, branded types for IDs.
+- Named exports only. `async/await` only. Max 3 positional params.
 
-- **No `any`.** Use `unknown` with type guards.
-- **No type assertions (`as`)** unless interfacing with untyped third-party
-  code. Add a comment explaining why.
-- **No `@ts-ignore`.** Fix the type error or file an issue.
-- **No non-null assertions (`!`).** Handle the null case.
-- **Use discriminated unions** for domain states and error types.
-- **Use branded types** for domain identifiers (`ProblemId`, `TopicId`).
-- **Named exports only.** No default exports.
+### Domain
+- Mathematical content is NEVER AI-generated. Classify and retrieve only.
+- Taxonomy codes: `DOMAIN-SUBTOPIC` format (e.g., `NT-DIV`, `ALG-FEQ`).
+- AI classifications are always `ai_proposed` until trainer-validated.
 
-## Code Style
+### Testing
+- Co-locate tests. Test behaviour, not implementation.
+- Factory functions for test data. Mock at boundaries only.
 
-- **Pure functions preferred.** Push side effects to the edges.
-- **Early returns** over nested conditionals.
-- **Max 3 positional parameters.** Use an options object for more.
-- **Async/await only.** No `.then()` chains.
-- **Comments explain _why_, not _what_.** Code should be self-documenting.
-- **No commented-out code.** Use git history.
-- **TODO format:** `// TODO(#issue): description`
+### Error Handling
+- Domain errors: `Result<T, E>` with typed discriminated unions.
+- Never swallow errors.
 
-## React Patterns
+### Git
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`.
+- Atomic commits. Squash-merge to main.
 
-- **Server state:** TanStack Query (React Query). No manual fetch + useState.
-- **Local state:** React hooks only. No global state library unless justified.
-- **Components:** Functional components with TypeScript props interfaces.
-- **LaTeX:** Use the shared `MathRenderer` component. No direct KaTeX calls.
-- **Test IDs:** Use `data-testid` attributes for E2E tests.
-- **Accessibility:** Every interactive element must have an accessible label.
-
-## Testing
-
-- **Co-locate tests:** `Component.test.tsx` next to `Component.tsx`.
-- **Test behaviour, not implementation.** Refactoring should not break tests.
-- **Use factory functions** for test data (`buildProblem()`, `buildTechnique()`).
-- **Mock at boundaries only.** Prefer in-memory fakes over mocking frameworks.
-- **AI fixtures:** Use recorded responses (VCR pattern) for AI service tests.
-
-## Domain-Specific Rules
-
-- **Mathematical content is never AI-generated.** The system classifies and
-  retrieves — it does not generate proofs or solutions.
-- **Taxonomy codes follow the established format:** `DOMAIN-SUBTOPIC`
-  (e.g., `NT-DIV`, `ALG-FEQ`, `GEO-S-ANG`).
-- **Difficulty is multi-dimensional.** Never reduce it to a single scalar.
-  Use the complexity dimensions defined in the domain model.
-- **AI classifications are always provisional.** Mark them as `ai_proposed`
-  until a trainer validates.
-
-## Naming Conventions
+### Naming
 
 | Element | Convention | Example |
 |---------|-----------|---------|
@@ -86,20 +72,7 @@ PostgreSQL + pgvector, Azure OpenAI, Azure Static Web Apps.
 | API paths | kebab-case | `/api/training-sessions` |
 | Env vars | UPPER_SNAKE, prefixed | `MATHPILOT_DB_URL` |
 
-## Error Handling
-
-- **Domain errors:** Typed discriminated unions returned as `Result<T, E>`.
-- **Infrastructure errors:** Caught at boundary, mapped to domain errors.
-- **Never swallow errors.** Every catch block logs or propagates.
-
-## Git
-
-- **Conventional commits:** `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
-  `chore:`.
-- **Atomic commits.** Each commit compiles and passes tests.
-- **Squash-merge** feature branches to main.
-
-## What NOT To Do
+### What NOT To Do
 
 - Do not generate mathematical proofs or solutions.
 - Do not hardcode AI model identifiers — use configuration.
