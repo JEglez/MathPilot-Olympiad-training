@@ -1,0 +1,93 @@
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  gap: 0.5rem;
+}
+
+.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.bubble {
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.925rem;
+  line-height: 1.65;
+  position: relative;
+}
+
+.user .bubble {
+  background: var(--color-primary);
+  color: #fff;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.assistant .bubble {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-bottom-left-radius: 0.25rem;
+}
+
+.userText {
+  margin: 0;
+}
+
+.assistantText {
+  overflow-x: auto;
+}
+
+.assistantText p {
+  margin: 0 0 0.5rem;
+}
+
+.assistantText p:last-child {
+  margin-bottom: 0;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  font-size: 0.75rem;
+  background: #eff6ff;
+  color: var(--color-primary);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 0.2rem 0.6rem;
+  text-decoration: none;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: #dbeafe;
+  text-decoration: none;
+}

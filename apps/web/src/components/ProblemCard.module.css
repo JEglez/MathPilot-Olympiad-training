@@ -1,0 +1,157 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s;
+}
+
+.card:hover {
+  border-color: var(--color-primary);
+}
+
+.header {
+  margin-bottom: 0.75rem;
+}
+
+.meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.competition {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.year {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.level {
+  font-size: 0.7rem;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.score {
+  font-size: 0.7rem;
+  background: #dcfce7;
+  color: #166534;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.title a {
+  color: var(--color-text);
+}
+
+.title a:hover {
+  color: var(--color-primary);
+}
+
+.titleButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.titleButton:hover {
+  color: var(--color-primary);
+}
+
+.statement {
+  font-size: 0.925rem;
+  color: var(--color-text);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tags {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.expandBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.expandBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.answer {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.dims {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.dims dt {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.dims dd {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.detailLink {
+  font-size: 0.875rem;
+  font-weight: 500;
+}

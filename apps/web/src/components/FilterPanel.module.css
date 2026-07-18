@@ -1,0 +1,94 @@
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.clearBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.clearBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.group {
+  margin-bottom: 1rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.select,
+.input {
+  width: 100%;
+  padding: 0.45rem 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+}
+
+.select:focus,
+.input:focus {
+  border-color: var(--color-primary);
+}
+
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.yearRange {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.yearRange .input {
+  flex: 1;
+}
+
+.yearSep {
+  color: var(--color-text-muted);
+}

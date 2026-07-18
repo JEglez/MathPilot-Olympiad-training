@@ -1,0 +1,49 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: none;
+  cursor: default;
+  white-space: nowrap;
+}
+
+button.tag {
+  cursor: pointer;
+}
+
+button.tag:hover {
+  filter: brightness(0.9);
+}
+
+.nt {
+  background: var(--color-tag-nt-bg);
+  color: var(--color-tag-nt);
+}
+
+.geo {
+  background: var(--color-tag-geo-bg);
+  color: var(--color-tag-geo);
+}
+
+.alg {
+  background: var(--color-tag-alg-bg);
+  color: var(--color-tag-alg);
+}
+
+.comb {
+  background: var(--color-tag-comb-bg);
+  color: var(--color-tag-comb);
+}
+
+.technique {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.default {
+  background: #f1f5f9;
+  color: #475569;
+}

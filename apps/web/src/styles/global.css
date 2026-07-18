@@ -1,0 +1,48 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-tag-nt: #3b82f6;
+  --color-tag-geo: #10b981;
+  --color-tag-alg: #f59e0b;
+  --color-tag-comb: #8b5cf6;
+  --color-tag-nt-bg: #eff6ff;
+  --color-tag-geo-bg: #ecfdf5;
+  --color-tag-alg-bg: #fffbeb;
+  --color-tag-comb-bg: #f5f3ff;
+  --radius: 0.5rem;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+}
+
+.katex-display {
+  overflow-x: auto;
+}
