@@ -136,6 +136,55 @@ Each layer only makes sense once the previous one is proven:
 
 ---
 
+## 7. Cost Efficiency Principles
+
+**This platform is open to the public and free to use.** Every architectural and
+implementation decision must prioritise low operational cost. The system should
+scale with the number of **problems ingested**, not the number of **users served**.
+
+### Core Rules
+
+1. **AI at ingestion, not at runtime.** The expensive LLM calls (classification,
+   embedding generation, taxonomy tagging) happen once when a problem enters
+   the system. User-facing operations (search, recommendations, mastery updates)
+   must avoid per-request LLM calls whenever possible.
+
+2. **Pre-compute everything possible.** Personalised difficulty scores, problem
+   recommendations, and gap detection should be computed from pre-indexed data
+   using deterministic rules and scoring functions — not live LLM inference.
+
+3. **Pre-author over generate.** Hints should be stored as structured sequences
+   on each Solution entity, revealed progressively — not generated on the fly.
+   Feedback should compare student techniques to solution techniques using rules,
+   not LLM analysis per submission.
+
+4. **Use the cheapest model that works.** When an LLM call is truly needed (e.g.,
+   parsing an ambiguous natural-language search query), use the smallest model
+   sufficient for the task (e.g., GPT-4o-mini for intent parsing, not GPT-4o).
+
+5. **Prefer consumption-based pricing.** Azure Functions on Consumption plan,
+   Azure AI Search at the smallest viable tier. Pay for what you use, not for
+   idle capacity.
+
+6. **No Cosmos DB unless strongly justified.** A small relational database
+   (Azure SQL Basic or PostgreSQL Flexible Server) is sufficient for the entity
+   model. The problem corpus, student profiles, and mastery data are well under
+   the scale threshold where NoSQL becomes necessary.
+
+### What This Means for Future Decisions
+
+| Decision Area | Cost-Efficient Choice |
+|---------------|----------------------|
+| Hint generation | Pre-authored hint sequences, not live LLM |
+| Student feedback | Rule-based technique comparison, not LLM analysis |
+| Search | Structured filters + pre-computed embeddings, LLM only for ambiguous queries |
+| Gap detection | Deterministic rules ("3 failures on T-X → gap"), not LLM evaluation |
+| Plan generation | Template-based (slot techniques via prerequisite DAG), not LLM from scratch |
+| Mastery updates | Rule engine per attempt, no AI involved |
+| Embedding model | text-embedding-3-small (cheaper, sufficient for similarity) |
+
+---
+
 ## Next Steps
 
 - [ ] System Architecture and Domain Model
