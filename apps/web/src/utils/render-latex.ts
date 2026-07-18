@@ -23,8 +23,12 @@ type Segment = TextSegment | InlineMathSegment | DisplayMathSegment;
 /** Split raw LaTeX-annotated text into plain-text and math segments. */
 export function parseLatexSegments(text: string): Segment[] {
   const segments: Segment[] = [];
-  // Match $$...$$ (display) first, then $...$ (inline)
-  const pattern = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g;
+  // Match all four delimiter styles in priority order:
+  //   \[...\]  display   \\[\\s\\S]*?\\]
+  //   \(...\)  inline    \\(.*?\\)
+  //   $$...$$ display
+  //   $...$   inline
+  const pattern = /(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -35,7 +39,11 @@ export function parseLatexSegments(text: string): Segment[] {
     }
 
     const raw = match[0];
-    if (raw.startsWith("$$")) {
+    if (raw.startsWith("\\[")) {
+      segments.push({ kind: "display", content: raw.slice(2, -2) });
+    } else if (raw.startsWith("\\(")) {
+      segments.push({ kind: "inline", content: raw.slice(2, -2) });
+    } else if (raw.startsWith("$$")) {
       segments.push({ kind: "display", content: raw.slice(2, -2) });
     } else {
       segments.push({ kind: "inline", content: raw.slice(1, -1) });
