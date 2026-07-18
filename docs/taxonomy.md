@@ -104,67 +104,189 @@ olympiad inequality and polynomial toolkit.
 
 ### NT — Number Theory & Arithmetic
 
+> **Design note:** OMM state-level number theory is surprisingly accessible —
+> divisibility, parity, basic modular arithmetic, and simple Diophantine equations.
+> The jump to Fermat/Euler, CRT, and valuations happens at the national-prep level.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `NT-DIV` | Divisibility & GCD | Euclidean algorithm, Bézout, divisibility tricks |
-| `NT-MOD` | Modular Arithmetic | Congruences, Fermat/Euler, quadratic residues, order |
-| `NT-PRM` | Primes & Factorisation | FTA, prime distribution heuristics, Legendre's formula |
-| `NT-DIO` | Diophantine Equations | Pell, Vieta jumping, descent, parametric families |
-| `NT-VAL` | Valuations & Local Methods | p-adic valuations, LTE lemma, local-global ideas |
-| `NT-MUL` | Multiplicative Functions | Euler's totient, Möbius, convolution |
-| `NT-CON` | Constructions in NT | Explicit constructions meeting number-theoretic constraints |
+| `NT-BAS` | Integer Properties & Parity | Even/odd arguments; properties of sums and products; digit-sum tricks; last-digit analysis; basic divisibility rules (2, 3, 4, 5, 9, 11) |
+| `NT-DIV` | Divisibility & GCD | Division algorithm; GCD and LCM via factorisation; Euclidean algorithm (basic); Bézout's identity (statement); divisibility in competition problems |
+| `NT-PRM-BAS` | Prime Numbers & Factorisation | Fundamental Theorem of Arithmetic; trial division; counting divisors; recognising prime structure in a problem |
+| `NT-MOD-BAS` | Introduction to Modular Arithmetic | Congruence notation; residue classes; arithmetic with remainders; simple linear congruences; "clock arithmetic" intuition |
+| `NT-DIO-BAS` | Elementary Diophantine Equations | Linear Diophantine equations (ax + by = c); existence of solutions via GCD; parametric families; simple quadratic Diophantines (x² + y² = n for small n) |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `NT-MOD` | Modular Arithmetic (Full) | Fermat's Little Theorem; Euler's theorem; Wilson's theorem; order of an element; solving polynomial congruences; systems of congruences and CRT |
+| `NT-PRM` | Advanced Prime Theory | Legendre's formula (v_p(n!)); Bertrand's postulate (applications); prime gaps in competition; sieve ideas |
+| `NT-DIO` | Diophantine Equations (Full) | Pell equations; Vieta jumping; infinite descent; parametric solutions; bounding arguments for Diophantine problems |
+| `NT-MUL` | Multiplicative Functions | Euler's totient; number-of-divisors function τ; sum-of-divisors function σ; multiplicativity proofs; Möbius function (introduction) |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `NT-VAL` | Valuations & Local Methods | p-adic valuations; Lifting the Exponent Lemma; Hensel's lemma; local-global reasoning |
+| `NT-QR` | Quadratic Residues & Reciprocity | Legendre symbol; Euler's criterion; quadratic reciprocity; Jacobi symbol |
+| `NT-CON` | Constructions in Number Theory | Explicit constructions satisfying number-theoretic constraints; Zsygmondy's theorem; algebraic number theory in contests |
 
 ### GEO-S — Synthetic & Projective Geometry
 
+> **Design note:** OMM state geometry is Euclidean fundamentals — triangle properties,
+> congruence/similarity criteria, basic circle theorems. No trigonometry, no directed
+> angles, no projective methods. The split into GEO-S and GEO-A happens naturally
+> because students at the state level only use synthetic methods.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `GEO-S-TRI` | Triangle Geometry | Cevians, pedal triangles, notable points and circles |
-| `GEO-S-CIR` | Circles & Cyclic Quads | Power of a point, radical axes, Ptolemy, cyclic quadrilateral properties |
-| `GEO-S-ANG` | Angle Chasing & Trigonometric Cevians | Directed angles, trig-cevian relations |
-| `GEO-S-COL` | Collinearity & Concurrence | Menelaus, Ceva, radical axis concurrence, Desargues |
-| `GEO-S-PRJ` | Projective Methods | Cross-ratio, harmonic division, poles and polars, projective transformations |
-| `GEO-S-3D` | Solid Geometry | 3D constructions, cross-sections, dihedral angles |
+| `GEO-S-FUN` | Euclidean Fundamentals | Points, lines, angles (types and measurement); parallel and perpendicular lines; angle relationships at transversals; basic constructions with ruler and compass |
+| `GEO-S-TRI-BAS` | Triangle Basics | Triangle inequality; angle-sum property; congruence criteria (SSS, SAS, ASA, AAS); similarity criteria (AA, SAS, SSS); notable points — centroid, incentre, circumcentre, orthocentre (definitions and basic properties) |
+| `GEO-S-QUAD` | Quadrilaterals & Polygons | Properties of parallelograms, rectangles, rhombi, trapezoids; interior angle sums; diagonals; inscribed and circumscribed polygons (basic) |
+| `GEO-S-CIR-BAS` | Circle Basics | Central and inscribed angle theorem; tangent-radius perpendicularity; chords and arcs; inscribed and circumscribed polygons; basic tangent-line problems |
+| `GEO-S-AREA` | Areas & Geometric Measurement | Area formulas for triangles, quadrilaterals, circles; area decomposition and addition/subtraction; area ratios from similarity; perimeter and area optimization (basic) |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GEO-S-TRI` | Triangle Geometry (Advanced) | Cevians (Ceva's theorem); medial and pedal triangles; Stewart's theorem; angle bisector theorem; notable circles (nine-point circle introduction); trigonometric identities in triangle context |
+| `GEO-S-CIR` | Circles & Cyclic Quadrilaterals | Power of a point; radical axis and radical centre; Ptolemy's theorem and inequality; cyclic quadrilateral properties; tangent-line constructions; Simson line |
+| `GEO-S-ANG` | Angle Chasing (Directed Angles) | Directed angle formulation; systematic angle chasing; inscribed angle corollaries; angles in tangent-chord configurations |
+| `GEO-S-COL` | Collinearity & Concurrence | Menelaus' theorem; Ceva's theorem (trigonometric form); radical axis concurrence; Desargues' theorem; proving collinearity via area ratios |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GEO-S-PRJ` | Projective Methods | Cross-ratio; harmonic division and harmonic conjugates; poles and polars; projective transformations; La Hire's theorem |
+| `GEO-S-3D` | Solid Geometry | 3D constructions; cross-sections of solids; dihedral angles; spatial angle chasing |
 
 ### GEO-A — Analytic & Transformational Geometry
 
+> **Design note:** At OMM state level, coordinate geometry is limited to distance,
+> midpoint, and line equations. Complex numbers and inversion are national/ISL-level
+> tools. We add a foundational tier for basic analytic methods.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `GEO-A-CRD` | Coordinate Geometry | Cartesian methods, parametric curves, area via shoelace |
-| `GEO-A-CPX` | Complex Numbers in Geometry | Unit circle, rotation, spiral similarity via multiplication |
-| `GEO-A-INV` | Inversion | Circle inversion, coaxial circles, inversion distance formulas |
-| `GEO-A-TRN` | Geometric Transformations | Reflections, rotations, homotheties, spiral similarities, isogonal conjugates |
-| `GEO-A-VEC` | Vector Methods | Dot/cross product proofs, barycentric coordinates |
+| `GEO-A-BAS` | Basic Coordinate Geometry | Cartesian plane; distance formula; midpoint formula; slope and equation of a line; perpendicularity and parallelism via slopes; basic locus problems |
+| `GEO-A-TRN-BAS` | Elementary Transformations | Reflections (over axes and lines); rotations (90°, 180°); translations; basic symmetry arguments; identifying transformation in a problem |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GEO-A-CRD` | Coordinate Methods (Full) | Shoelace formula for area; parametric representations; circle equations; conic sections in contest problems; coordinate bashing strategies |
+| `GEO-A-TRN` | Geometric Transformations (Full) | Homotheties and dilation; spiral similarities; isogonal conjugates; composition of transformations; choosing the right transformation |
+| `GEO-A-VEC` | Vector Methods | Dot product and cross product proofs; position vectors; centroid and barycentric coordinates (introduction) |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GEO-A-CPX` | Complex Numbers in Geometry | Unit circle representation; rotation and scaling via multiplication; triangle centres in complex coordinates; spiral similarity via complex division |
+| `GEO-A-INV` | Inversion | Circle inversion; image of lines and circles; coaxial circles; inversion distance formulas; choosing inversion centre and radius |
+| `GEO-A-BARY` | Barycentric Coordinates | Full barycentric framework; displacement vectors; distance and area in barycentric; intersection formulas |
 
 ### COMB-E — Enumerative & Algebraic Combinatorics
 
+> **Design note:** OMM state-level combinatorics focuses on direct counting —
+> addition/multiplication principles, basic permutations/combinations, and the
+> binomial theorem. PIE and generating functions are intermediate/advanced tools.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `COMB-E-CNT` | Counting Principles | Addition/multiplication, PIE, stars-and-bars, Burnside |
-| `COMB-E-GEN` | Generating Functions | OGFs, EGFs, coefficient extraction, convolution |
-| `COMB-E-BIJ` | Bijections & Combinatorial Identities | Bijective proofs, Vandermonde, hockey stick, Catalan |
-| `COMB-E-REC` | Combinatorial Recurrences | Setting up and solving counting recurrences |
-| `COMB-E-PRB` | Probabilistic & Expected Value Arguments | Probabilistic method, linearity of expectation, random colouring |
+| `COMB-E-BAS` | Counting Principles | Addition and multiplication principles; systematic listing and tree diagrams; counting with restrictions; complementary counting ("count the opposite") |
+| `COMB-E-PC` | Permutations & Combinations | Permutations without/with repetition; combinations; choosing subsets; arrangements with identical objects; multinomial coefficient (basic) |
+| `COMB-E-BIN` | Binomial Theorem & Pascal's Triangle | Binomial expansion; Pascal's triangle properties; basic binomial identities (Pascal's rule, sum of row); simple coefficient extraction |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `COMB-E-CNT` | Advanced Counting | Principle of Inclusion-Exclusion (PIE); stars-and-bars; derangements; Burnside's lemma; counting with symmetry |
+| `COMB-E-BIJ` | Bijections & Combinatorial Identities | Bijective proofs; Vandermonde identity; hockey stick identity; Catalan numbers; ballot problem |
+| `COMB-E-REC` | Combinatorial Recurrences | Setting up counting recurrences; solving linear recurrences; Fibonacci-type problems; transfer matrix method (introduction) |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `COMB-E-GEN` | Generating Functions | OGFs and EGFs; coefficient extraction; convolution; snake oil method; composition of generating functions |
+| `COMB-E-PRB` | Probabilistic & Expected Value Arguments | Probabilistic method (Erdős); linearity of expectation; Lovász Local Lemma; random colouring and existence proofs |
+| `COMB-E-ALG` | Algebraic Combinatorics | Linear algebra in counting; transfer matrices (full); Stanley's reciprocity; polynomial method |
 
 ### COMB-S — Structural & Extremal Combinatorics
 
+> **Design note:** The Pigeonhole Principle and small-case Ramsey arguments (e.g.,
+> "among 6 people…") appear at the OMM state level. Graph theory and extremal
+> methods are intermediate/advanced.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `COMB-S-GRP` | Graph Theory | Eulerian/Hamiltonian, planarity, colouring, matching, Turán |
-| `COMB-S-EXT` | Extremal Problems | Turán-type, forbidden configurations, Kruskal-Katona |
-| `COMB-S-RAM` | Ramsey Theory | Ramsey numbers, Hales-Jewett, Schur's theorem |
-| `COMB-S-CGE` | Combinatorial Geometry | Convex hulls, point configurations, Helly, Erdős–Szekeres |
-| `COMB-S-SET` | Set Systems & Designs | Sunflower, VC dimension, Latin squares, block designs |
-| `COMB-S-ORD` | Partially Ordered Sets | Dilworth, antichains, lattice theory in contest settings |
+| `COMB-S-PHP` | Pigeonhole Principle | Basic PHP statement; generalised PHP; choosing "pigeons" and "holes" in word problems; existence proofs via PHP on finite sets |
+| `COMB-S-GRP-BAS` | Introduction to Graph Theory | Vertices, edges, degree; handshaking lemma; paths and cycles; trees (basic properties); graph colouring (chromatic number for small graphs); bipartite graphs |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `COMB-S-GRP` | Graph Theory (Full) | Eulerian and Hamiltonian paths/cycles; planarity and Euler's formula; matchings (Hall's theorem); connectivity; Turán's theorem; tournament graphs |
+| `COMB-S-EXT` | Extremal Combinatorics | Extremal principle ("pick the max/min"); Turán-type problems; forbidden subgraph results; Kruskal-Katona theorem |
+| `COMB-S-CGE` | Combinatorial Geometry | Convex hulls; point configurations in the plane; Helly's theorem; Erdős–Szekeres theorem; lattice point arguments |
+| `COMB-S-RAM-BAS` | Ramsey Theory (Introduction) | Small Ramsey numbers; R(3,3) = 6 and related arguments; Schur's theorem; party-problem style proofs |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `COMB-S-RAM` | Ramsey Theory (Full) | General Ramsey bounds; Hales-Jewett theorem; Rado's theorem; infinite Ramsey theory; applications to number theory |
+| `COMB-S-SET` | Set Systems & Designs | Sunflower lemma; VC dimension; Latin squares and orthogonal arrays; block designs; Bollobás set-pairs inequality |
+| `COMB-S-ORD` | Partially Ordered Sets | Dilworth's theorem; antichains and chain decomposition; Sperner's theorem; lattice theory in contest settings |
 
 ### GAME — Strategies, Algorithms & Games
 
+> **Design note:** Games, invariants, and parity arguments are a **staple of OMM
+> state-level problems**. The Mexican olympiad tradition introduces these early —
+> Nim-like games, parity invariants, and colouring arguments appear from the very
+> first competitions a student encounters. This makes GAME unusual: its Tier 1 is
+> among the first things any OMM student learns.
+
+#### Tier 1 — Foundational (OMM State / Regional Level)
+
 | Code | Subtopic | Scope |
 |------|----------|-------|
-| `GAME-INV` | Invariants | Quantities preserved under operations — parity, colouring, modular invariants |
-| `GAME-MON` | Monovariants | Quantities that strictly increase/decrease — energy arguments, potential functions |
-| `GAME-STR` | Game Strategy | Nim-values, Sprague-Grundy, pairing strategies, strategy-stealing |
-| `GAME-ALG` | Algorithmic Processes | Greedy, swaps, scheduling, extremal processes |
-| `GAME-CON` | Constructions & Examples | Building explicit objects satisfying constraints |
+| `GAME-PAR` | Parity & Simple Invariants | Even/odd arguments; checkerboard colouring; simple modular invariants; "what doesn't change?" reasoning; tiling problems via colouring |
+| `GAME-NIMBASIC` | Simple Game Analysis | Take-away games (Nim-like); analysing small cases; finding winning/losing positions; backward induction from endgame; "make it a multiple of k" strategies |
+| `GAME-CON-BAS` | Elementary Constructions | Building explicit examples satisfying constraints; proof by construction; showing existence by building the object |
+
+#### Tier 2 — Intermediate (OMM National Prep / Pre-ISL Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GAME-INV` | Invariants (Full) | Modular invariants; sum invariants; colouring invariants in complex settings; identifying hidden conserved quantities; impossibility proofs via invariants |
+| `GAME-MON` | Monovariants & Potential Functions | Quantities that strictly increase/decrease; energy arguments; convergence proofs; "eventually terminates" arguments; potential functions for processes |
+| `GAME-ALG` | Algorithmic Processes | Greedy algorithms; swapping arguments; scheduling and optimization; extremal element processes; iterative improvement |
+
+#### Tier 3 — Advanced (OMM National / ISL / IMO Level)
+
+| Code | Subtopic | Scope |
+|------|----------|-------|
+| `GAME-STR` | Game Strategy (Full) | Sprague-Grundy theory; Nim-values for compound games; strategy-stealing arguments; combinatorial game theory; surreal numbers (introduction) |
+| `GAME-CON` | Advanced Constructions | Complex constructions meeting multiple constraints; probabilistic existence arguments turned constructive; extremal constructions |
 
 ---
 
@@ -226,65 +348,169 @@ a primary subtopic but may appear across many. Below is a representative sample
 | `T-MUIRHEAD` | Muirhead's Inequality & Majorisation | advanced | ALG-ADV-INQ |
 | `T-UVWXYZ` | uvw / pqr Substitution Method | elite | ALG-ADV-INQ |
 
-### Number Theory Techniques (NT-*)
+### Number Theory Techniques — Foundational Tier (NT-BAS, NT-DIV, NT-PRM-BAS, NT-MOD-BAS, NT-DIO-BAS)
 
-| Code | Technique | Cognitive Load |
-|------|-----------|----------------|
-| `T-EUCLID` | Euclidean Algorithm & Bézout's Identity | foundational |
-| `T-FLT` | Fermat's Little Theorem | foundational |
-| `T-EULER` | Euler's Theorem & totient function | intermediate |
-| `T-CRT` | Chinese Remainder Theorem | intermediate |
-| `T-LTE` | Lifting the Exponent Lemma | advanced |
-| `T-ZSIG` | Zsygmondy's Theorem | elite |
-| `T-HENSEL` | Hensel's Lemma (lifting solutions mod p^k) | advanced |
-| `T-VIETA-JUMP` | Vieta Jumping (root flipping) | advanced |
-| `T-DESCENT` | Infinite Descent | intermediate |
-| `T-LEGENDRE` | Legendre's Formula (p-adic valuation of n!) | intermediate |
-| `T-ORD` | Order of an element mod n | intermediate |
-| `T-QR` | Quadratic Residues & Legendre Symbol | advanced |
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-PARITY-NT` | Parity Arguments in Number Theory | foundational | NT-BAS |
+| `T-LASTDIGIT` | Last-Digit & Digit-Sum Analysis | foundational | NT-BAS |
+| `T-DIVRULES` | Divisibility Rules (2, 3, 4, 5, 9, 11) | foundational | NT-BAS |
+| `T-DIVALGO` | Division Algorithm & Remainders | foundational | NT-DIV |
+| `T-EUCLID` | Euclidean Algorithm (basic GCD computation) | foundational | NT-DIV |
+| `T-GCDLCM` | GCD/LCM via Prime Factorisation | foundational | NT-DIV |
+| `T-FTA` | Fundamental Theorem of Arithmetic | foundational | NT-PRM-BAS |
+| `T-DIVCOUNT` | Counting Divisors from Factorisation | foundational | NT-PRM-BAS |
+| `T-CONGBASIC` | Congruence Notation & Residue Arithmetic | foundational | NT-MOD-BAS |
+| `T-LINCONG` | Solving Simple Linear Congruences | foundational | NT-MOD-BAS |
+| `T-LINDIO` | Linear Diophantine Equations (ax + by = c) | foundational | NT-DIO-BAS |
+| `T-SMALLDIO` | Small Quadratic Diophantines (x² ± y² = n) | foundational | NT-DIO-BAS |
 
-### Geometry Techniques (GEO-*)
+### Number Theory Techniques — Intermediate Tier (NT-MOD, NT-PRM, NT-DIO, NT-MUL)
 
-| Code | Technique | Cognitive Load |
-|------|-----------|----------------|
-| `T-ANGCHASE` | Directed Angle Chasing | foundational |
-| `T-POP` | Power of a Point | foundational |
-| `T-RADAXIS` | Radical Axis & Radical Centre | intermediate |
-| `T-PTOLEMY` | Ptolemy's Inequality / Equality | intermediate |
-| `T-INV` | Circle Inversion | advanced |
-| `T-SPIRAL` | Spiral Similarity | advanced |
-| `T-BARY` | Barycentric Coordinates | advanced |
-| `T-CPXGEO` | Complex Number Geometry | advanced |
-| `T-PROJECTIVE` | Projective methods (cross-ratio, poles/polars) | elite |
-| `T-SIMSON` | Simson Line & Pedal Triangles | intermediate |
-| `T-HOMOTHETY` | Homothety & Dilation | foundational |
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-FLT` | Fermat's Little Theorem | intermediate | NT-MOD |
+| `T-EULER` | Euler's Theorem & Totient Function | intermediate | NT-MOD |
+| `T-WILSON` | Wilson's Theorem | intermediate | NT-MOD |
+| `T-ORD` | Order of an Element mod n | intermediate | NT-MOD |
+| `T-CRT` | Chinese Remainder Theorem | intermediate | NT-MOD |
+| `T-LEGENDRE` | Legendre's Formula (v_p(n!)) | intermediate | NT-PRM |
+| `T-DESCENT` | Infinite Descent | intermediate | NT-DIO |
+| `T-VIETA-JUMP` | Vieta Jumping (root flipping) | intermediate | NT-DIO |
+| `T-PELLBASIC` | Pell Equations (basic) | intermediate | NT-DIO |
+| `T-TOTIENT` | Euler's Totient Properties & Computation | intermediate | NT-MUL |
+| `T-DIVSUMFN` | Divisor Sum Functions (τ, σ) | intermediate | NT-MUL |
 
-### Combinatorics Techniques (COMB-*)
+### Number Theory Techniques — Advanced Tier (NT-VAL, NT-QR, NT-CON)
 
-| Code | Technique | Cognitive Load |
-|------|-----------|----------------|
-| `T-PHP` | Pigeonhole Principle (basic & generalised) | foundational |
-| `T-PIE` | Principle of Inclusion-Exclusion | foundational |
-| `T-DBLCNT` | Double Counting | foundational |
-| `T-EXTREMAL` | Extremal Principle (pick the max/min) | intermediate |
-| `T-PROBMETHOD` | Probabilistic Method | advanced |
-| `T-LINALG` | Linear Algebra in Combinatorics | elite |
-| `T-OGF` | Ordinary Generating Functions | advanced |
-| `T-BURNSIDE` | Burnside's Lemma | intermediate |
-| `T-RAMSEY` | Ramsey-type arguments | advanced |
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-PADIC` | p-adic Valuations | advanced | NT-VAL |
+| `T-LTE` | Lifting the Exponent Lemma | advanced | NT-VAL |
+| `T-HENSEL` | Hensel's Lemma (lifting mod p^k) | advanced | NT-VAL |
+| `T-QR` | Quadratic Residues & Legendre Symbol | advanced | NT-QR |
+| `T-QRECIP` | Quadratic Reciprocity | elite | NT-QR |
+| `T-ZSIG` | Zsygmondy's Theorem | elite | NT-CON |
 
-### Strategy & Process Techniques (GAME-*)
+### Geometry Techniques — Foundational Tier (GEO-S-FUN, GEO-S-TRI-BAS, GEO-S-QUAD, GEO-S-CIR-BAS, GEO-S-AREA, GEO-A-BAS, GEO-A-TRN-BAS)
 
-| Code | Technique | Cognitive Load |
-|------|-----------|----------------|
-| `T-PARITY` | Parity Invariant | foundational |
-| `T-COLOURING` | Colouring Arguments | foundational |
-| `T-MODINV` | Modular Invariant | intermediate |
-| `T-ENERGY` | Energy / Potential Function (monovariant) | intermediate |
-| `T-NIMVAL` | Nim-values & Sprague-Grundy | advanced |
-| `T-PAIRING` | Pairing Strategy | foundational |
-| `T-STEALSTRAT` | Strategy Stealing | intermediate |
-| `T-GREEDY` | Greedy Construction | intermediate |
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-ANGREL` | Angle Relationships at Parallels | foundational | GEO-S-FUN |
+| `T-CONGCRIT` | Triangle Congruence Criteria (SSS, SAS, ASA) | foundational | GEO-S-TRI-BAS |
+| `T-SIMCRIT` | Triangle Similarity Criteria (AA, SAS, SSS) | foundational | GEO-S-TRI-BAS |
+| `T-PYTHAG` | Pythagorean Theorem & Converse | foundational | GEO-S-TRI-BAS |
+| `T-NOTABLEPTS` | Notable Points (centroid, incentre, circumcentre, orthocentre) | foundational | GEO-S-TRI-BAS |
+| `T-INSCANG` | Inscribed Angle Theorem & Corollaries | foundational | GEO-S-CIR-BAS |
+| `T-TANGPERP` | Tangent-Radius Perpendicularity | foundational | GEO-S-CIR-BAS |
+| `T-AREADECOMP` | Area Decomposition & Ratios | foundational | GEO-S-AREA |
+| `T-DISTMID` | Distance & Midpoint Formulas | foundational | GEO-A-BAS |
+| `T-SLOPEQ` | Slope & Line Equations | foundational | GEO-A-BAS |
+| `T-BASICSYM` | Basic Symmetry (reflection, rotation 90°/180°) | foundational | GEO-A-TRN-BAS |
+
+### Geometry Techniques — Intermediate Tier (GEO-S-TRI, GEO-S-CIR, GEO-S-ANG, GEO-S-COL, GEO-A-CRD, GEO-A-TRN, GEO-A-VEC)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-CEVA` | Ceva's Theorem (ratio & trig forms) | intermediate | GEO-S-TRI |
+| `T-STEWART` | Stewart's Theorem | intermediate | GEO-S-TRI |
+| `T-ANGBISECT` | Angle Bisector Theorem | intermediate | GEO-S-TRI |
+| `T-POP` | Power of a Point | intermediate | GEO-S-CIR |
+| `T-RADAXIS` | Radical Axis & Radical Centre | intermediate | GEO-S-CIR |
+| `T-PTOLEMY` | Ptolemy's Inequality / Equality | intermediate | GEO-S-CIR |
+| `T-SIMSON` | Simson Line & Pedal Triangles | intermediate | GEO-S-CIR |
+| `T-ANGCHASE` | Directed Angle Chasing | intermediate | GEO-S-ANG |
+| `T-MENELAUS` | Menelaus' Theorem | intermediate | GEO-S-COL |
+| `T-SHOELACE` | Shoelace Formula for Area | intermediate | GEO-A-CRD |
+| `T-HOMOTHETY` | Homothety & Dilation | intermediate | GEO-A-TRN |
+| `T-SPIRAL` | Spiral Similarity | intermediate | GEO-A-TRN |
+| `T-DOTCROSS` | Dot & Cross Product Proofs | intermediate | GEO-A-VEC |
+
+### Geometry Techniques — Advanced Tier (GEO-S-PRJ, GEO-A-CPX, GEO-A-INV, GEO-A-BARY)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-PROJECTIVE` | Projective Methods (cross-ratio, poles/polars) | elite | GEO-S-PRJ |
+| `T-HARMONIC` | Harmonic Division & Conjugates | advanced | GEO-S-PRJ |
+| `T-CPXGEO` | Complex Number Geometry | advanced | GEO-A-CPX |
+| `T-INV` | Circle Inversion | advanced | GEO-A-INV |
+| `T-BARY` | Barycentric Coordinates (full framework) | advanced | GEO-A-BARY |
+
+### Combinatorics Techniques — Foundational Tier (COMB-E-BAS, COMB-E-PC, COMB-E-BIN, COMB-S-PHP, COMB-S-GRP-BAS)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-ADDMULT` | Addition & Multiplication Principles | foundational | COMB-E-BAS |
+| `T-COMPCOUNT` | Complementary Counting | foundational | COMB-E-BAS |
+| `T-PERMCOMB` | Permutations & Combinations Formulas | foundational | COMB-E-PC |
+| `T-MULTINOMIAL` | Arrangements with Identical Objects | foundational | COMB-E-PC |
+| `T-BINOMEXP` | Binomial Expansion & Pascal's Triangle | foundational | COMB-E-BIN |
+| `T-PHP` | Pigeonhole Principle (basic & generalised) | foundational | COMB-S-PHP |
+| `T-HANDSHAKE` | Handshaking Lemma & Degree Arguments | foundational | COMB-S-GRP-BAS |
+| `T-GRAPHCOLOR` | Graph Colouring (small cases, bipartite) | foundational | COMB-S-GRP-BAS |
+
+### Combinatorics Techniques — Intermediate Tier (COMB-E-CNT, COMB-E-BIJ, COMB-E-REC, COMB-S-GRP, COMB-S-EXT, COMB-S-CGE, COMB-S-RAM-BAS)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-PIE` | Principle of Inclusion-Exclusion | intermediate | COMB-E-CNT |
+| `T-STARSBAR` | Stars and Bars | intermediate | COMB-E-CNT |
+| `T-DERANGE` | Derangements | intermediate | COMB-E-CNT |
+| `T-BURNSIDE` | Burnside's Lemma | intermediate | COMB-E-CNT |
+| `T-BIJECTION` | Bijective Proofs | intermediate | COMB-E-BIJ |
+| `T-CATALAN` | Catalan Numbers & Ballot Problem | intermediate | COMB-E-BIJ |
+| `T-COUNTREC` | Setting Up Counting Recurrences | intermediate | COMB-E-REC |
+| `T-DBLCNT` | Double Counting | intermediate | COMB-S-GRP |
+| `T-HALL` | Hall's Marriage Theorem | intermediate | COMB-S-GRP |
+| `T-TURAN` | Turán's Theorem | intermediate | COMB-S-GRP |
+| `T-EXTREMAL` | Extremal Principle (pick the max/min) | intermediate | COMB-S-EXT |
+| `T-CONVHULL` | Convex Hull & Erdős–Szekeres | intermediate | COMB-S-CGE |
+| `T-RAMSEY` | Small Ramsey Arguments (R(3,3)=6 style) | intermediate | COMB-S-RAM-BAS |
+
+### Combinatorics Techniques — Advanced Tier (COMB-E-GEN, COMB-E-PRB, COMB-E-ALG, COMB-S-RAM, COMB-S-SET, COMB-S-ORD)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-OGF` | Ordinary Generating Functions | advanced | COMB-E-GEN |
+| `T-EGF` | Exponential Generating Functions | advanced | COMB-E-GEN |
+| `T-PROBMETHOD` | Probabilistic Method (Erdős) | advanced | COMB-E-PRB |
+| `T-LINEXP` | Linearity of Expectation | advanced | COMB-E-PRB |
+| `T-LINALG` | Linear Algebra in Combinatorics | elite | COMB-E-ALG |
+| `T-GENRAMSEY` | General Ramsey Bounds & Hales-Jewett | advanced | COMB-S-RAM |
+| `T-SUNFLOWER` | Sunflower Lemma | advanced | COMB-S-SET |
+| `T-DILWORTH` | Dilworth's Theorem & Chain Decomposition | advanced | COMB-S-ORD |
+| `T-SPERNER` | Sperner's Theorem | advanced | COMB-S-ORD |
+
+### Strategy & Game Techniques — Foundational Tier (GAME-PAR, GAME-NIMBASIC, GAME-CON-BAS)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-PARITY` | Parity Invariant | foundational | GAME-PAR |
+| `T-COLOURING` | Checkerboard & Colouring Arguments | foundational | GAME-PAR |
+| `T-TILING` | Tiling Impossibility via Colouring | foundational | GAME-PAR |
+| `T-NIMBASIC` | Take-away Game Analysis (small cases, backward induction) | foundational | GAME-NIMBASIC |
+| `T-PAIRING` | Pairing Strategy | foundational | GAME-NIMBASIC |
+| `T-CONSTRUCT` | Proof by Explicit Construction | foundational | GAME-CON-BAS |
+
+### Strategy & Game Techniques — Intermediate Tier (GAME-INV, GAME-MON, GAME-ALG)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-MODINV` | Modular Invariant | intermediate | GAME-INV |
+| `T-SUMINV` | Sum / Product Invariant | intermediate | GAME-INV |
+| `T-ENERGY` | Energy / Potential Function (monovariant) | intermediate | GAME-MON |
+| `T-TERMINATE` | Termination Proofs via Monovariant | intermediate | GAME-MON |
+| `T-GREEDY` | Greedy Construction | intermediate | GAME-ALG |
+| `T-SWAP` | Swapping / Exchange Argument | intermediate | GAME-ALG |
+| `T-STEALSTRAT` | Strategy Stealing | intermediate | GAME-ALG |
+
+### Strategy & Game Techniques — Advanced Tier (GAME-STR, GAME-CON)
+
+| Code | Technique | Cognitive Load | Subtopic |
+|------|-----------|----------------|----------|
+| `T-NIMVAL` | Nim-values & Sprague-Grundy Theory | advanced | GAME-STR |
+| `T-COMPGAME` | Compound Game Decomposition | advanced | GAME-STR |
+| `T-ADVCON` | Advanced Constructions (multi-constraint, extremal) | advanced | GAME-CON |
 
 ---
 
@@ -691,50 +917,109 @@ MathPilot Taxonomy
 │       └── ALG-SET      Algebraic Structures (—)
 │
 ├── NT — Number Theory & Arithmetic
-│   ├── NT-DIV   Divisibility & GCD (4 techniques)
-│   ├── NT-MOD   Modular Arithmetic (5 techniques)
-│   ├── NT-PRM   Primes & Factorisation (4 techniques)
-│   ├── NT-DIO   Diophantine Equations (5 techniques)
-│   ├── NT-VAL   Valuations & Local Methods (3 techniques)
-│   ├── NT-MUL   Multiplicative Functions (3 techniques)
-│   └── NT-CON   Constructions in NT (2 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── NT-BAS      Integer Properties & Parity (3 techniques)
+│   │   ├── NT-DIV      Divisibility & GCD (3 techniques)
+│   │   ├── NT-PRM-BAS  Prime Numbers & Factorisation (2 techniques)
+│   │   ├── NT-MOD-BAS  Intro Modular Arithmetic (2 techniques)
+│   │   └── NT-DIO-BAS  Elementary Diophantine Equations (2 techniques)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── NT-MOD  Modular Arithmetic — Full (5 techniques)
+│   │   ├── NT-PRM  Advanced Prime Theory (1 technique)
+│   │   ├── NT-DIO  Diophantine Equations — Full (3 techniques)
+│   │   └── NT-MUL  Multiplicative Functions (2 techniques)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── NT-VAL  Valuations & Local Methods (3 techniques)
+│       ├── NT-QR   Quadratic Residues & Reciprocity (2 techniques)
+│       └── NT-CON  Constructions in NT (1 technique)
 │
 ├── GEO-S — Synthetic & Projective Geometry
-│   ├── GEO-S-TRI  Triangle Geometry (5 techniques)
-│   ├── GEO-S-CIR  Circles & Cyclic Quads (4 techniques)
-│   ├── GEO-S-ANG  Angle Chasing (3 techniques)
-│   ├── GEO-S-COL  Collinearity & Concurrence (4 techniques)
-│   ├── GEO-S-PRJ  Projective Methods (3 techniques)
-│   └── GEO-S-3D   Solid Geometry (2 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── GEO-S-FUN      Euclidean Fundamentals (1 technique)
+│   │   ├── GEO-S-TRI-BAS  Triangle Basics (4 techniques)
+│   │   ├── GEO-S-QUAD     Quadrilaterals & Polygons (—)
+│   │   ├── GEO-S-CIR-BAS  Circle Basics (2 techniques)
+│   │   └── GEO-S-AREA     Areas & Measurement (1 technique)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── GEO-S-TRI  Triangle Geometry — Advanced (3 techniques)
+│   │   ├── GEO-S-CIR  Circles & Cyclic Quads (4 techniques)
+│   │   ├── GEO-S-ANG  Directed Angle Chasing (1 technique)
+│   │   └── GEO-S-COL  Collinearity & Concurrence (1 technique)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── GEO-S-PRJ  Projective Methods (2 techniques)
+│       └── GEO-S-3D   Solid Geometry (—)
 │
 ├── GEO-A — Analytic & Transformational Geometry
-│   ├── GEO-A-CRD  Coordinate Geometry (3 techniques)
-│   ├── GEO-A-CPX  Complex Numbers (3 techniques)
-│   ├── GEO-A-INV  Inversion (2 techniques)
-│   ├── GEO-A-TRN  Transformations (4 techniques)
-│   └── GEO-A-VEC  Vector Methods (3 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── GEO-A-BAS      Basic Coordinate Geometry (2 techniques)
+│   │   └── GEO-A-TRN-BAS  Elementary Transformations (1 technique)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── GEO-A-CRD  Coordinate Methods — Full (1 technique)
+│   │   ├── GEO-A-TRN  Transformations — Full (2 techniques)
+│   │   └── GEO-A-VEC  Vector Methods (1 technique)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── GEO-A-CPX   Complex Number Geometry (1 technique)
+│       ├── GEO-A-INV   Inversion (1 technique)
+│       └── GEO-A-BARY  Barycentric Coordinates (1 technique)
 │
 ├── COMB-E — Enumerative & Algebraic Combinatorics
-│   ├── COMB-E-CNT  Counting Principles (5 techniques)
-│   ├── COMB-E-GEN  Generating Functions (3 techniques)
-│   ├── COMB-E-BIJ  Bijections & Identities (4 techniques)
-│   ├── COMB-E-REC  Combinatorial Recurrences (3 techniques)
-│   └── COMB-E-PRB  Probabilistic Arguments (3 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── COMB-E-BAS  Counting Principles (2 techniques)
+│   │   ├── COMB-E-PC   Permutations & Combinations (2 techniques)
+│   │   └── COMB-E-BIN  Binomial Theorem & Pascal (1 technique)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── COMB-E-CNT  Advanced Counting / PIE (4 techniques)
+│   │   ├── COMB-E-BIJ  Bijections & Identities (2 techniques)
+│   │   └── COMB-E-REC  Combinatorial Recurrences (1 technique)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── COMB-E-GEN  Generating Functions (2 techniques)
+│       ├── COMB-E-PRB  Probabilistic Arguments (2 techniques)
+│       └── COMB-E-ALG  Algebraic Combinatorics (1 technique)
 │
 ├── COMB-S — Structural & Extremal Combinatorics
-│   ├── COMB-S-GRP  Graph Theory (6 techniques)
-│   ├── COMB-S-EXT  Extremal Problems (3 techniques)
-│   ├── COMB-S-RAM  Ramsey Theory (2 techniques)
-│   ├── COMB-S-CGE  Combinatorial Geometry (3 techniques)
-│   ├── COMB-S-SET  Set Systems & Designs (3 techniques)
-│   └── COMB-S-ORD  Posets (2 techniques)
+│   │
+│   ├── Tier 1 — Foundational (OMM State / Regional)
+│   │   ├── COMB-S-PHP      Pigeonhole Principle (1 technique)
+│   │   └── COMB-S-GRP-BAS  Intro Graph Theory (2 techniques)
+│   │
+│   ├── Tier 2 — Intermediate (OMM National Prep)
+│   │   ├── COMB-S-GRP      Graph Theory — Full (3 techniques)
+│   │   ├── COMB-S-EXT      Extremal Combinatorics (1 technique)
+│   │   ├── COMB-S-CGE      Combinatorial Geometry (1 technique)
+│   │   └── COMB-S-RAM-BAS  Ramsey Theory — Intro (1 technique)
+│   │
+│   └── Tier 3 — Advanced (OMM National / ISL / IMO)
+│       ├── COMB-S-RAM  Ramsey Theory — Full (1 technique)
+│       ├── COMB-S-SET  Set Systems & Designs (1 technique)
+│       └── COMB-S-ORD  Posets (2 techniques)
 │
 └── GAME — Strategies, Algorithms & Games
-    ├── GAME-INV  Invariants (4 techniques)
-    ├── GAME-MON  Monovariants (3 techniques)
-    ├── GAME-STR  Game Strategy (4 techniques)
-    ├── GAME-ALG  Algorithmic Processes (3 techniques)
-    └── GAME-CON  Constructions & Examples (2 techniques)
+    │
+    ├── Tier 1 — Foundational (OMM State / Regional)
+    │   ├── GAME-PAR      Parity & Simple Invariants (3 techniques)
+    │   ├── GAME-NIMBASIC  Simple Game Analysis (2 techniques)
+    │   └── GAME-CON-BAS   Elementary Constructions (1 technique)
+    │
+    ├── Tier 2 — Intermediate (OMM National Prep)
+    │   ├── GAME-INV  Invariants — Full (2 techniques)
+    │   ├── GAME-MON  Monovariants (2 techniques)
+    │   └── GAME-ALG  Algorithmic Processes (3 techniques)
+    │
+    └── Tier 3 — Advanced (OMM National / ISL / IMO)
+        ├── GAME-STR  Game Strategy — Full (2 techniques)
+        └── GAME-CON  Advanced Constructions (1 technique)
 
-Total: 8 domains, 14 ALG subtopics (3 tiers) + 40+ other subtopics, 150+ techniques, 500+ learning objectives
+Total: 8 domains, 58 subtopics across 3 tiers, 160+ techniques, 500+ learning objectives
 ```
