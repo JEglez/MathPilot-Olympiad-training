@@ -222,10 +222,7 @@ multiple axes rather than a single difficulty number.
 | `estimated_solve_time_minutes` | int | Typical time for a prepared student |
 | `elegance_rating` | float | Community/editorial rating of beauty |
 | `status` | enum | `draft`, `in_review`, `published`, `archived` |
-| `ingestion_source` | enum | `pdf_upload`, `manual_entry`, `api_import`, `community` |
-| `source_document_url` | string | Original PDF or URL the problem was extracted from |
 | `language` | string | Original language (e.g. `es`, `en`, `zh`) |
-| `statement_embedding` | vector | Semantic embedding for AI Search (generated, not user-set) |
 | `created_at` | timestamp | When added to the platform |
 | `reviewed_at` | timestamp | When a human verified classification |
 | `reviewed_by` | FK → User | Who reviewed it |
@@ -380,7 +377,7 @@ miss the pedagogical structure that experienced coaches use.
 | `relationship_type` | enum | `similar`, `easier_variant`, `harder_variant`, `prerequisite`, `dual`, `generalisation` |
 | `strength` | float | How strong the relationship is (0–1) |
 | `explanation` | text | Why these problems are related |
-| `detected_by` | enum | `ai_embedding`, `ai_classification`, `human_coach`, `community` |
+| `detected_by` | enum | `ai`, `human_coach`, `community` |
 | `created_at` | timestamp | |
 
 **Relationship types:**
@@ -400,7 +397,6 @@ miss the pedagogical structure that experienced coaches use.
 **Impact on existing model:**
 - Enriches recommendations beyond technique matching
 - Enables "problem ladders" — sequences of increasing difficulty on the same idea
-- AI can auto-detect similarity via `statement_embedding` cosine similarity
 
 ---
 
@@ -874,73 +870,4 @@ Same problems, different difficulty — driven by the model, not a label.
 | **ProblemRelationship graph** | Powers "similar problems", "easier variant", and problem ladders |
 | **MasterySnapshot history** | Enables progress tracking, regression detection, and trend reporting |
 | **TrainingPlan with weekly structure** | Turns ephemeral AI recommendations into trackable, adaptive plans |
-| **Problem lifecycle (draft → published)** | Supports PDF ingestion pipeline with human review before problems go live |
-| **Semantic embeddings on Problem** | Enables natural-language search and AI-powered similarity detection |
-
----
-
-## Search & Retrieval Architecture
-
-The domain model is designed to support **three search modalities** via Azure AI
-Search:
-
-### 1. Structured Search (Filters)
-
-Uses the multi-dimensional classification fields directly:
-
-```
-Filter: competition_level = 'national'
-    AND techniques CONTAINS 'T-PHP'
-    AND creativity_demand IN ('insightful', 'inventive')
-    AND status = 'published'
-```
-
-**Indexed fields:** All enum fields on Problem, plus Topic/Subtopic/Technique
-codes from join tables (denormalised into the search index as string arrays).
-
-### 2. Semantic Search (Natural Language)
-
-Uses `statement_embedding` (vector field) for similarity:
-
-```
-Query: "problems about colouring integers to avoid arithmetic progressions"
-→ Vector similarity search on statement_embedding
-→ Returns problems whose statements are semantically close
-```
-
-**Embedding source:** Problem statement + solution sketch, embedded via Azure
-OpenAI `text-embedding-3-large`.
-
-### 3. Hybrid Search (Chat / Conversational)
-
-Combines structured filters with semantic search, orchestrated by Azure OpenAI:
-
-```
-User: "Give me 3 problems that would help Maria practice inversion,
-       at national level, that she hasn't seen before"
-
-→ AI decomposes into:
-  1. Filter: technique = T-INV, competition_level = national, status = published
-  2. Exclude: problems in Maria's session_attempts
-  3. Rank by: personalised_difficulty(problem, Maria) ∈ [0.3, 0.6]
-  4. Return top 3
-```
-
-### Search Index Schema (Azure AI Search)
-
-| Field | Type | Searchable | Filterable | Facetable |
-|-------|------|------------|------------|-----------|
-| `id` | string | — | ✓ | — |
-| `title` | string | ✓ | — | — |
-| `statement` | string | ✓ | — | — |
-| `statement_embedding` | vector(3072) | ✓ (vector) | — | — |
-| `topic_codes` | string[] | — | ✓ | ✓ |
-| `subtopic_codes` | string[] | — | ✓ | ✓ |
-| `technique_codes` | string[] | — | ✓ | ✓ |
-| `competition_level` | string | — | ✓ | ✓ |
-| `position_in_paper` | string | — | ✓ | ✓ |
-| `proof_style` | string | — | ✓ | ✓ |
-| `creativity_demand` | string | — | ✓ | ✓ |
-| `competition_abbrev` | string | — | ✓ | ✓ |
-| `source_year` | int | — | ✓ | ✓ |
-| `status` | string | — | ✓ | — |
+| **Problem lifecycle (draft → published)** | Supports content curation with human review before problems go live |
