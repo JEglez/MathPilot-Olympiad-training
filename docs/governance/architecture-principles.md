@@ -15,8 +15,15 @@
 │           Domain Layer              │  Entities, value objects, domain logic
 ├─────────────────────────────────────┤
 │        Infrastructure Layer         │  Database, AI services, blob storage
+├─────────────────────────────────────┤
+│          Shared Utilities           │  Pure functions, no layer affinity
 └─────────────────────────────────────┘
 ```
+
+**Shared Utilities** (`functions/src/shared/`) are pure functions with no
+external dependencies and no layer affinity. Any layer — and operational
+scripts — may import from here. Examples: LaTeX normalisation, dedup hashing,
+competition name resolution.
 
 ### Rules
 
@@ -25,6 +32,11 @@
   clients, no framework code in domain entities.
 - **Application layer orchestrates.** It calls domain logic and infrastructure
   adapters but contains no business rules itself.
+- **`Result<T,E>` at domain boundaries only.** Domain functions return
+  `Result<T,E>`. Application and infrastructure layers may `throw` for
+  unexpected errors — do not force `Result<T,E>` everywhere.
+- **Shared utilities have zero framework/DB/HTTP imports.** They must remain
+  importable without any runtime setup.
 
 ## 2. Domain-Driven Design
 
@@ -161,10 +173,10 @@ quick tasks. They are **not deployed** as Azure Functions or any always-on servi
 
 ### Shared code
 
-Scripts may import from `db/migrations/` (SQL only, never TypeScript imports
-from `functions/src/`). If a script genuinely needs domain logic (e.g., the
-same dedup hash algorithm used at runtime), extract that logic to a
-**shared utility** in `packages/shared/` rather than coupling to either layer.
+Scripts may import from `functions/src/shared/` — pure utility functions
+(LaTeX normalisation, dedup hash, competition resolver) that have zero
+framework/DB/HTTP dependencies. They must NOT import from `functions/src/domain/`,
+`functions/src/infrastructure/`, or `functions/src/application/`.
 
 
 - **Fitness functions** (automated checks) enforce architectural rules in CI.

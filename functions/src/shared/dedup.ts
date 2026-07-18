@@ -2,8 +2,8 @@
 // Produces a content-only fingerprint for exact-match deduplication across datasets
 
 import { createHash } from "crypto";
-import type { DedupHash } from "../shared/branded";
-import { asDedupHash } from "../shared/branded";
+import type { DedupHash } from "../domain/shared/branded";
+import { asDedupHash } from "../domain/shared/branded";
 
 /**
  * Normalise a problem statement to a content-only fingerprint:
