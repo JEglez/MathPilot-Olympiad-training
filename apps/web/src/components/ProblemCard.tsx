@@ -1,20 +1,24 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import type { ProblemCard as ProblemCardType } from "../services/api";
 import { renderLatexToHtml } from "../utils/render-latex";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
 import { TaxonomyTag } from "./TaxonomyTag";
 
 interface Props {
   readonly problem: ProblemCardType;
+  readonly index?: number;
   readonly onSelect?: (id: string) => void;
 }
 
 type LevelVariant = "local" | "state" | "national" | "international";
+
+const LEVEL_STYLES: Record<LevelVariant, { bg: string; text: string }> = {
+  local:         { bg: "#DCFCE7", text: "#166534" },
+  state:         { bg: "#FEF3C7", text: "#92400E" },
+  national:      { bg: "#DBEAFE", text: "#1D4ED8" },
+  international: { bg: "#EDE9FE", text: "#5B21B6" },
+};
 
 function levelVariant(level: string | null | undefined): LevelVariant {
   const l = (level ?? "").toLowerCase();
@@ -25,90 +29,130 @@ function levelVariant(level: string | null | undefined): LevelVariant {
   return "local";
 }
 
-export function ProblemCard({ problem, onSelect }: Props) {
+export function ProblemCard({ problem, index, onSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const statementHtml = renderLatexToHtml(problem.statement);
   const titleHtml = renderLatexToHtml(problem.title);
+  const variant = levelVariant(problem.competition_level);
+  const levelStyle = LEVEL_STYLES[variant];
 
   return (
-    <Card className={cn(
-      "group transition-all duration-150 border-border",
-      "hover:border-teal hover:shadow-sm"
-    )}>
-      <CardHeader className="pb-2">
-        {/* Meta row */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          {problem.competition_level && (
-            <Badge variant={levelVariant(problem.competition_level)}>
-              {problem.competition_level}
-            </Badge>
-          )}
-          {problem.competition && (
-            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase tracking-wide">
-              {problem.competition}
-            </span>
-          )}
-          {problem.source_year !== null && (
-            <span className="text-xs text-muted-foreground">{problem.source_year}</span>
-          )}
-          {problem.search_score !== undefined && (
-            <Badge variant="score" className="ml-auto">
-              {(problem.search_score * 100).toFixed(0)}% match
-            </Badge>
-          )}
+    <div
+      className={cn(
+        "bg-card rounded-xl border transition-all duration-150 overflow-hidden",
+        expanded ? "border-amber-300" : "border-border hover:border-amber-200"
+      )}
+      style={expanded ? { boxShadow: "0 2px 12px rgba(245,158,11,0.1)" } : {}}
+    >
+      {/* Main row: 3 columns */}
+      <div className="grid gap-3 p-4" style={{ gridTemplateColumns: "32px 1fr 88px" }}>
+        {/* Ordinal */}
+        <div className="text-right pt-0.5">
+          <span
+            className="font-mono font-bold text-lg leading-none"
+            style={{ color: "#E2E8F0" }}
+          >
+            {index !== undefined ? String(index + 1).padStart(2, "0") : "—"}
+          </span>
         </div>
 
-        {/* Title */}
-        <h2 className="text-base font-semibold leading-snug m-0">
-          {onSelect ? (
-            <button
-              className="text-left text-foreground hover:text-teal transition-colors bg-transparent border-0 p-0 font-semibold text-base leading-snug cursor-pointer"
-              onClick={() => onSelect(problem.id)}
-              type="button"
-              dangerouslySetInnerHTML={{ __html: titleHtml }}
-            />
-          ) : (
-            <Link
-              to={`/problems/${problem.id}`}
-              className="text-foreground hover:text-teal transition-colors no-underline hover:no-underline"
-              dangerouslySetInnerHTML={{ __html: titleHtml }}
-            />
-          )}
-        </h2>
-      </CardHeader>
+        {/* Content */}
+        <div className="min-w-0">
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            {problem.competition_level && (
+              <span
+                className="text-[9px] font-bold uppercase tracking-[0.07em] px-2 py-0.5 rounded"
+                style={{ background: levelStyle.bg, color: levelStyle.text }}
+              >
+                {problem.competition_level}
+              </span>
+            )}
+            {problem.competition && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#94A3B8" }}>
+                {problem.competition}
+              </span>
+            )}
+            {problem.source_year !== null && (
+              <span className="text-[10px]" style={{ color: "#CBD5E1" }}>{problem.source_year}</span>
+            )}
+            {problem.search_score !== undefined && (
+              <span
+                className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded"
+                style={{ background: "#FFFBEB", color: "#92400E", border: "1px solid #FCD34D" }}
+              >
+                {(problem.search_score * 100).toFixed(0)}% match
+              </span>
+            )}
+          </div>
 
-      <CardContent className="pt-0">
-        {/* Problem statement */}
-        <div
-          className="text-sm text-foreground/90 leading-relaxed line-clamp-3 overflow-x-auto"
-          dangerouslySetInnerHTML={{ __html: statementHtml }}
-        />
-      </CardContent>
+          {/* Title */}
+          <div className="mb-2">
+            {onSelect ? (
+              <button
+                className="text-left font-semibold text-sm leading-snug bg-transparent border-0 p-0 cursor-pointer transition-colors text-foreground hover:text-amber-600"
+                onClick={() => onSelect(problem.id)}
+                type="button"
+                dangerouslySetInnerHTML={{ __html: titleHtml }}
+              />
+            ) : (
+              <Link
+                to={`/problems/${problem.id}`}
+                className="font-semibold text-sm leading-snug text-foreground hover:text-amber-600 transition-colors"
+                style={{ textDecoration: "none" }}
+                dangerouslySetInnerHTML={{ __html: titleHtml }}
+              />
+            )}
+          </div>
 
-      <CardFooter className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-border/60">
-        <div className="flex flex-wrap gap-1.5">
-          {problem.topics.map((t) => (
-            <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="topic" />
-          ))}
-          {problem.techniques.map((t) => (
-            <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="technique" />
-          ))}
+          {/* Statement preview */}
+          <div
+            className="text-xs leading-relaxed mb-2 overflow-x-auto"
+            style={{
+              color: "#64748B",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+            dangerouslySetInnerHTML={{ __html: statementHtml }}
+          />
+
+          {/* Tags */}
+          <div className="flex flex-wrap gap-1">
+            {problem.topics.map((t) => (
+              <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="topic" />
+            ))}
+            {problem.techniques.map((t) => (
+              <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="technique" />
+            ))}
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="shrink-0 text-muted-foreground hover:text-foreground h-8 px-2"
-          onClick={() => setExpanded((prev) => !prev)}
-          type="button"
-          aria-expanded={expanded}
-        >
-          {expanded ? <><ChevronUp size={14} /> Hide</> : <><ChevronDown size={14} /> Details</>}
-        </Button>
-      </CardFooter>
 
+        {/* Action column */}
+        <div className="flex flex-col items-end gap-2 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setExpanded((p) => !p)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            style={{
+              background: expanded ? "#FFFBEB" : "transparent",
+              color: "#92400E",
+              border: "1.5px solid #FCD34D",
+            }}
+          >
+            {expanded ? "Close ↑" : "Details ↓"}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded section */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-border/60 pt-4 space-y-3">
+        <div
+          className="px-5 pb-5 pt-4 space-y-3 border-t"
+          style={{ borderColor: "#FEF3C7" }}
+        >
           {problem.answer !== null && (
             <p className="text-sm">
               <span className="font-semibold">Answer: </span>
@@ -129,11 +173,15 @@ export function ProblemCard({ problem, onSelect }: Props) {
               <><dt className="text-muted-foreground font-medium">Entry barrier</dt><dd className="capitalize">{problem.entry_barrier}</dd></>
             )}
           </dl>
-          <Link to={`/problems/${problem.id}`} className="text-sm font-medium text-secondary hover:underline">
+          <Link
+            to={`/problems/${problem.id}`}
+            className="text-sm font-semibold hover:underline"
+            style={{ color: "#D97706" }}
+          >
             View full problem →
           </Link>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
