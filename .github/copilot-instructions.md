@@ -24,6 +24,7 @@ the `view` tool to read any document you need — do NOT guess at rules.
 | **Coding Standards** | `docs/governance/coding-standards.md` | When writing or reviewing TypeScript code |
 | **Testing Standards** | `docs/governance/testing-standards.md` | When planning or writing tests |
 | **AI Guidelines** | `docs/governance/ai-guidelines.md` | When working with any AI/LLM/embedding feature |
+| **UI/UX Constitution** | `docs/governance/ui-ux-constitution.md` | When writing or reviewing ANY React/CSS/UI code |
 | **Domain Model** | `docs/domain-model.md` | When designing entities or database schemas |
 | **Taxonomy** | `docs/taxonomy.md` | When working with problem classification |
 
@@ -80,3 +81,58 @@ These are the most critical rules. For full details, read the governance docs.
 - Do not put business logic in API handlers — delegate to application layer.
 - Do not create global mutable state.
 - Do not use `console.log` for production logging — use structured logger.
+
+---
+
+## Custom Agents
+
+This repo has two Copilot agents. **Use them proactively** — do not generate
+boilerplate manually or design ad-hoc when an agent is better suited.
+
+### Agent routing table
+
+| Agent | Tool | Best for | Auto-detected triggers |
+|-------|------|----------|----------------------|
+| **mathpilot-planner** | `mathpilot_plan_review` | Design decisions, new features, architecture reviews, governance compliance checks | "plan", "design", "architect", "implement feature", "set up", "add feature", "how should I" |
+| **mathpilot-codegen** | `mathpilot_scaffold` | Scaffold new entities, components, handlers, use-cases, migrations, scripts | "scaffold", "generate", "create a component", "new entity", "new handler", "new migration" |
+| **mathpilot-codegen** | `mathpilot_list_templates` | List available scaffold templates | "what templates", "what can codegen do" |
+
+### Auto-identification rules
+
+Both extensions run `onUserPromptSubmitted` hooks that **automatically inject**
+the right governance context based on keywords in your prompt. You do not need
+to explicitly invoke an agent — simply describe your intent:
+
+- **"scaffold a ProblemCard component"** → codegen injects UI/UX rules + suggests `mathpilot_scaffold`
+- **"plan a new training session feature"** → planner injects planning template + governance docs
+- **"create a responsive search page"** → both hooks fire: planning template + UI/UX constitution
+- **"generate a domain entity for Technique"** → codegen injects scaffold guidance + architecture rules
+
+### Recommended workflow for new features
+
+```
+1. Write your plan (objectives, layers, files)
+   → Call mathpilot_plan_review to check for violations
+
+2. For each new file needed:
+   → Call mathpilot_scaffold with the appropriate template
+   → Available: domain-entity, api-handler, application-use-case,
+                infrastructure-adapter, react-component, migration,
+                test-factory, script
+
+3. Fill in the generated TODO stubs with real logic
+
+4. For UI work: read docs/governance/ui-ux-constitution.md §11
+   (CodeGen Rules) before writing any component code
+```
+
+### UI/UX Rules (quick ref — full doc: `docs/governance/ui-ux-constitution.md`)
+
+- Page padding: **`px-4 sm:px-6`** — never bare `px-6`
+- Touch targets: **`min-h-[44px]`** on all buttons/links
+- Sidebars: mobile hamburger toggle + overlay drawer required
+- Grids: **must collapse to `grid-cols-1`** at `md:` breakpoint
+- No `<div onClick>` — use **`<button type="button">`**
+- LaTeX: always via **`renderLatexToHtml()`** — no direct KaTeX calls
+- No hardcoded hex colours — use **CSS token variables** or Tailwind theme classes
+- Every `.tsx` component needs a co-located **`.module.css`** with a `@media` block
