@@ -5,3 +5,4 @@ dist/
 
 # Azure Functions local secrets — never commit
 functions/local.settings.json
+apps/web/.env.local

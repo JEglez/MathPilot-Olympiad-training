@@ -44,7 +44,7 @@
 }
 
 .error {
-  color: #dc2626;
+  color: var(--color-error);
 }
 
 .list {
@@ -102,7 +102,7 @@
 }
 
 .facetActive {
-  background: #eff6ff;
+  background: var(--color-nav-active-bg);
   color: var(--color-primary);
   font-weight: 500;
 }

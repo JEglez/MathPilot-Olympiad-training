@@ -1,61 +1,120 @@
+import { MessageSquare, Search, Sigma } from "lucide-react";
+import type { LucideProps } from "lucide-react";
+import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
-import styles from "./App.module.css";
-import { BrowsePage } from "./pages/BrowsePage";
 import { ChatPage } from "./pages/ChatPage";
 import { ProblemDetailPage } from "./pages/ProblemDetailPage";
 import { SearchPage } from "./pages/SearchPage";
 
-function Header() {
+type LucideIcon = ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
+
+const NAV_ITEMS: Array<{ to: string; end?: boolean; icon: LucideIcon; label: string }> = [
+  { to: "/", end: true, icon: Search, label: "Search" },
+  { to: "/chat", icon: MessageSquare, label: "Chat" },
+];
+
+const DOMAINS = [
+  { label: "Algebra",       dot: "#F59E0B" },
+  { label: "Geometry",      dot: "#34D399" },
+  { label: "Number Theory", dot: "#60A5FA" },
+  { label: "Combinatorics", dot: "#C084FC" },
+] as const;
+
+const SIDEBAR_BG = "#0F172A";
+const SIDEBAR_FG = "rgba(255,255,255,0.6)";
+const SIDEBAR_ACTIVE_COLOR = "#F59E0B";
+const SIDEBAR_ACTIVE_BG = "rgba(245,158,11,0.15)";
+const SIDEBAR_SECTION_LABEL = "rgba(255,255,255,0.28)";
+
+function Sidebar() {
   return (
-    <header className={styles.header}>
-      <div className={styles.headerInner}>
-        <Link to="/" className={styles.logo}>
-          <span className={styles.logoMath}>∑</span> MathPilot
-        </Link>
-        <nav className={styles.nav}>
+    <aside
+      className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col"
+      style={{ background: SIDEBAR_BG, color: SIDEBAR_FG }}
+    >
+      {/* Logo */}
+      <Link
+        to="/"
+        className="flex items-center gap-2.5 px-5 py-5"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-base shrink-0"
+          style={{ background: "linear-gradient(135deg,#F59E0B,#D97706)", color: "#fff" }}
+        >
+          <Sigma size={17} />
+        </span>
+        <div className="flex flex-col leading-tight">
+          <span className="font-bold text-sm" style={{ color: "#fff" }}>MathPilot</span>
+          <span className="text-[9px] uppercase tracking-widest" style={{ color: SIDEBAR_ACTIVE_COLOR }}>Olympiad</span>
+        </div>
+      </Link>
+
+      {/* Training nav */}
+      <nav className="flex flex-col gap-0.5 px-3 pt-1">
+        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
+          style={{ color: SIDEBAR_SECTION_LABEL }}>
+          Training
+        </p>
+        {NAV_ITEMS.map(({ to, end, icon: Icon, label }) => (
           <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
+            key={to}
+            to={to}
+            end={end}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors"
+            style={({ isActive }) => isActive
+              ? { color: SIDEBAR_ACTIVE_COLOR, background: SIDEBAR_ACTIVE_BG, borderLeft: `2px solid ${SIDEBAR_ACTIVE_COLOR}`, fontWeight: 600 }
+              : { color: SIDEBAR_FG }
             }
           >
-            Search
+            <Icon size={15} />
+            {label}
           </NavLink>
-          <NavLink
-            to="/browse"
-            className={({ isActive }) =>
-              isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
-            }
+        ))}
+      </nav>
+
+      {/* Domains */}
+      <nav className="flex flex-col gap-0.5 px-3 pt-5">
+        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
+          style={{ color: SIDEBAR_SECTION_LABEL }}>
+          Domains
+        </p>
+        {DOMAINS.map(({ label, dot }) => (
+          <div
+            key={label}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium cursor-default"
+            style={{ color: SIDEBAR_FG }}
           >
-            Browse
-          </NavLink>
-          <NavLink
-            to="/chat"
-            className={({ isActive }) =>
-              isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
-            }
-          >
-            Chat
-          </NavLink>
-        </nav>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
+            {label}
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="mt-auto px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>6,445+ problems</p>
+        <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>IMO · USAMO · AIME</p>
       </div>
-    </header>
+    </aside>
   );
 }
 
 export function App() {
   return (
     <BrowserRouter>
-      <Header />
-      <main className={styles.main}>
-        <Routes>
-          <Route path="/" element={<SearchPage />} />
-          <Route path="/browse" element={<BrowsePage />} />
-          <Route path="/problems/:id" element={<ProblemDetailPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-        </Routes>
-      </main>
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex-1 ml-56 min-w-0 flex flex-col overflow-x-hidden">
+          <main className="flex-1 w-full min-w-0">
+            <Routes>
+              <Route path="/" element={<SearchPage />} />
+              <Route path="/problems/:id" element={<ProblemDetailPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
     </BrowserRouter>
   );
 }

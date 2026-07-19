@@ -3,7 +3,6 @@ import type { SearchFilters } from "../services/api";
 import { useChat } from "../hooks/useChat";
 import type { Citation } from "./ChatMessage";
 import { ChatMessage } from "./ChatMessage";
-import styles from "./ChatPanel.module.css";
 
 interface Props {
   readonly filters?: Omit<SearchFilters, "q" | "page" | "page_size">;
@@ -27,25 +26,23 @@ export function ChatPanel({ filters }: Props) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); }
   }
 
-  const citationList: Citation[] = citations.map((c) => ({
-    id: c.id,
-    title: c.title,
-  }));
+  const citationList: Citation[] = citations.map((c) => ({ id: c.id, title: c.title }));
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.messages}>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 120px)", minHeight: 400 }}>
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
-          <div className={styles.empty}>
-            <p>Ask me to find olympiad problems!</p>
-            <p className={styles.hint}>
-              Try: <em>"Find 3 number theory problems about pigeonhole"</em>
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="text-4xl mb-4">✦</div>
+            <p className="font-semibold text-base mb-1" style={{ color: "#0F172A" }}>
+              Ask me about olympiad problems
+            </p>
+            <p className="text-sm" style={{ color: "#94A3B8" }}>
+              Try: <em style={{ color: "#64748B" }}>"Find 3 number theory problems about pigeonhole"</em>
             </p>
           </div>
         )}
@@ -58,29 +55,47 @@ export function ChatPanel({ filters }: Props) {
             isStreaming={isStreaming && i === messages.length - 1 && msg.role === "assistant"}
           />
         ))}
-        {error && <p className={styles.error}>{error}</p>}
+        {error && (
+          <p className="text-xs text-center py-2" style={{ color: "#DC2626" }}>{error}</p>
+        )}
         <div ref={bottomRef} />
       </div>
 
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <textarea
-          ref={inputRef}
-          className={styles.textarea}
-          placeholder="Ask about olympiad problems… (Enter to send, Shift+Enter for newline)"
-          rows={2}
-          onKeyDown={handleKeyDown}
-          disabled={isStreaming}
-          aria-label="Chat input"
-        />
-        <button
-          className={styles.sendBtn}
-          type="submit"
-          disabled={isStreaming}
-          aria-label="Send message"
-        >
-          {isStreaming ? "…" : "Send ↑"}
-        </button>
-      </form>
+      {/* Input form */}
+      <div className="px-6 pb-6 pt-2" style={{ borderTop: "1px solid #E5E7EB" }}>
+        <form onSubmit={handleSubmit} className="flex gap-3 items-end">
+          <textarea
+            ref={inputRef}
+            rows={2}
+            placeholder="Ask about olympiad problems… (Enter to send, Shift+Enter for newline)"
+            className="flex-1 rounded-xl text-sm px-4 py-3 resize-none outline-none transition-all"
+            style={{
+              background: "#F8F9FC",
+              border: "1.5px solid #E2E8F0",
+              color: "#0F172A",
+              fontFamily: "inherit",
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "#F59E0B"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(245,158,11,0.1)"; }}
+            onBlur={(e)  => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.boxShadow = "none"; }}
+            onKeyDown={handleKeyDown}
+            disabled={isStreaming}
+            aria-label="Chat input"
+          />
+          <button
+            type="submit"
+            disabled={isStreaming}
+            className="h-12 px-5 rounded-xl text-sm font-semibold transition-all shrink-0"
+            style={{
+              background: isStreaming ? "#E2E8F0" : "#0F172A",
+              color: isStreaming ? "#94A3B8" : "#F59E0B",
+              border: "none",
+              cursor: isStreaming ? "not-allowed" : "pointer",
+            }}
+          >
+            {isStreaming ? "…" : "Send ↑"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

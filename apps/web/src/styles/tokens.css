@@ -1,0 +1,74 @@
+/* ── UCOL Graphic Governance — Design System Tokens ─────────────────────────
+ * Philosophy: Functional Minimalism + Swiss Design + Accessibility-Core
+ * WCAG 2.2 AA compliant. Zero shadows. No neumorphism/glassmorphism/brutalism.
+ * Reference: docs/governance/architecture-principles.md (UI standards)
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Brand colours ────────────────────────────────────────────────────── */
+  --color-primary:         #527630; /* Structure, nav, active state          */
+  --color-secondary:       #006096; /* Interactivity, links, focus ring      */
+  --color-btn-primary:     #0D7377; /* Button CTA background                 */
+  --color-btn-primary-hover: #0a5c60; /* Button CTA hover                   */
+
+  /* ── Surface & background ─────────────────────────────────────────────── */
+  --color-bg:     #FAFAFA; /* Screen & card backgrounds                      */
+  --color-surface: #FFFFFF; /* Elevated surfaces (cards, panels)             */
+
+  /* ── Text ─────────────────────────────────────────────────────────────── */
+  --color-text:         #1A1A1A; /* Body text (alias: --color-text-primary)  */
+  --color-text-primary: #1A1A1A;
+  --color-text-muted:   #4E4D4D; /* Secondary text, metadata                */
+  --color-text-secondary: #4E4D4D;
+
+  /* ── Border ───────────────────────────────────────────────────────────── */
+  --color-border: #B4B4B4; /* 1px borders only — no shadows                 */
+
+  /* ── Semantic states ──────────────────────────────────────────────────── */
+  --color-error:   #770F00;
+  --color-success: #527630; /* Same as primary                               */
+  --color-warning: #FBB034; /* Warning icons only (always paired with text)  */
+
+  /* ── Navigation ───────────────────────────────────────────────────────── */
+  --color-nav-active-bg: #EBF0F5;
+
+  /* ── Taxonomy domain tags (math domain semantics, not structural UI) ──── */
+  --color-tag-nt:      #006096; /* Number Theory — secondary blue            */
+  --color-tag-nt-bg:   #E3F2FD;
+  --color-tag-geo:     #527630; /* Geometry — primary green                  */
+  --color-tag-geo-bg:  #EAF2E3;
+  --color-tag-alg:     #B45309; /* Algebra — amber/warm                      */
+  --color-tag-alg-bg:  #FFF8E1;
+  --color-tag-comb:    #6B21A8; /* Combinatorics — purple                    */
+  --color-tag-comb-bg: #F3E8FF;
+
+  /* ── Shape ────────────────────────────────────────────────────────────── */
+  --radius: 0.5rem; /* 8px — matches button spec                             */
+
+  /* ── Spacing (4px module) ─────────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Typography scale (base 16px) ─────────────────────────────────────── */
+  --text-xs:   0.75rem;  /* 12px */
+  --text-sm:   0.875rem; /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg:   1.125rem; /* 18px */
+  --text-xl:   1.25rem;  /* 20px */
+  --text-2xl:  1.5rem;   /* 24px */
+  --text-3xl:  1.875rem; /* 30px */
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  --max-width: 1280px;
+  --screen-margin-mobile: 16px;
+  --screen-margin-desktop: 24px;
+
+  /* ── Interactive targets ──────────────────────────────────────────────── */
+  --min-touch-target: 44px;
+}

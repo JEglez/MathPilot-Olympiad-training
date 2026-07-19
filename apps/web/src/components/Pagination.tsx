@@ -1,4 +1,5 @@
-import styles from "./Pagination.module.css";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 
 interface Props {
   readonly page: number;
@@ -9,66 +10,49 @@ interface Props {
 
 export function Pagination({ page, total, pageSize, onPageChange }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
   if (totalPages <= 1) return null;
 
-  // Show at most 7 page buttons, centered around current page
   function pageNumbers(): number[] {
     const delta = 2;
     const range: number[] = [];
     const start = Math.max(1, page - delta);
     const end = Math.min(totalPages, page + delta);
-
     for (let i = start; i <= end; i++) range.push(i);
-
-    if (start > 1) range.unshift(-1, 1); // -1 = ellipsis
-    if (end < totalPages) range.push(-2, totalPages); // -2 = ellipsis
-
+    if (start > 1) range.unshift(-1, 1);
+    if (end < totalPages) range.push(-2, totalPages);
     return range;
   }
 
   return (
-    <nav className={styles.nav} aria-label="Pagination">
-      <button
-        className={styles.btn}
+    <nav className="flex items-center justify-center gap-1 py-4" aria-label="Pagination">
+      <Button variant="outline" size="sm"
         onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-        type="button"
-        aria-label="Previous page"
-      >
+        disabled={page <= 1} type="button" aria-label="Previous page">
         ←
-      </button>
+      </Button>
 
       {pageNumbers().map((n, i) => {
-        if (n < 0) {
-          return (
-            <span key={`ellipsis-${i}`} className={styles.ellipsis}>
-              …
-            </span>
-          );
-        }
+        if (n < 0) return <span key={`e${i}`} className="px-1 text-muted-foreground text-sm">…</span>;
         return (
-          <button
-            key={n}
-            className={`${styles.btn} ${n === page ? styles.active : ""}`}
-            onClick={() => onPageChange(n)}
-            type="button"
+          <button key={n} type="button"
             aria-current={n === page ? "page" : undefined}
-          >
+            onClick={() => onPageChange(n)}
+            className={cn(
+              "h-9 min-w-[36px] px-3 rounded-lg text-sm font-medium transition-colors",
+              n === page
+                ? "bg-teal text-white"
+                : "text-foreground hover:bg-muted border border-border"
+            )}>
             {n}
           </button>
         );
       })}
 
-      <button
-        className={styles.btn}
+      <Button variant="outline" size="sm"
         onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-        type="button"
-        aria-label="Next page"
-      >
+        disabled={page >= totalPages} type="button" aria-label="Next page">
         →
-      </button>
+      </Button>
     </nav>
   );
 }

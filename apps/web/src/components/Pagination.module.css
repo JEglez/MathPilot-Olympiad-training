@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  margin-top: 1.5rem;
+  margin-top: var(--space-6);
   flex-wrap: wrap;
 }
 
@@ -12,10 +12,14 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text-primary);
   min-width: 2.25rem;
-  transition: background 0.1s, border-color 0.1s;
+  min-height: var(--min-touch-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:hover:not(:disabled) {
@@ -25,7 +29,7 @@
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.38; /* UCOL disabled = 38% opacity */
   cursor: not-allowed;
 }
 
@@ -42,5 +46,5 @@
 
 .ellipsis {
   padding: 0.375rem 0.25rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
