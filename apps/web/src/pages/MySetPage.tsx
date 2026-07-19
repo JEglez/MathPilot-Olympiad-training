@@ -6,9 +6,6 @@ import { exportProblems, type ExportFormat } from "../utils/print-problems";
 import { renderLatexToHtml } from "../utils/render-latex";
 import styles from "./MySetPage.module.css";
 
-type PracticeOrder = "listed" | "shuffled" | "difficulty";
-type ActiveMode = "practice" | "export";
-
 const DOMAIN_TAGS: Record<string, { text: string; bg: string }> = {
   "Number Theory": { text: "#006096", bg: "#E3F2FD" },
   "Geometry":      { text: "#527630", bg: "#EAF2E3" },
@@ -28,13 +25,6 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; ext: string }[] = [
 
 export function MySetPage() {
   const { problems, remove, clear } = useProblemSet();
-
-  // Practice mode settings
-  const [activeMode, setActiveMode] = useState<ActiveMode>("practice");
-  const [timed, setTimed] = useState(false);
-  const [hints, setHints] = useState(true);
-  const [revealAnswers, setRevealAnswers] = useState(false);
-  const [order, setOrder] = useState<PracticeOrder>("listed");
 
   // Export mode settings
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
@@ -213,117 +203,73 @@ export function MySetPage() {
 
               {/* Mode: Practice */}
               <div
-                className={cn(styles.modeCard, activeMode === "practice" && styles.modeCardSelected, "mb-3")}
-                onClick={() => setActiveMode("practice")}
+                className={cn(styles.modeCard, "mb-3")}
+                title="Coming soon"
+                style={{ cursor: "default", opacity: 0.6 }}
               >
                 <div className="flex items-center gap-2">
                   <input
                     type="radio"
                     id="mode-practice"
                     name="active-mode"
-                    checked={activeMode === "practice"}
-                    onChange={() => setActiveMode("practice")}
+                    checked={false}
+                    onChange={() => undefined}
                     className="accent-[#F59E0B]"
+                    disabled
                   />
-                  <label htmlFor="mode-practice" className="font-semibold text-sm cursor-pointer">
-                    🎯 Practice Session
+                  <label htmlFor="mode-practice" className="font-semibold text-sm" style={{ cursor: "default" }}>
+                    Practice Session
                   </label>
+                  <span
+                    className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "#F1F5F9", color: "#64748B" }}
+                  >
+                    Coming soon
+                  </span>
                 </div>
-
-                {activeMode === "practice" && (
-                  <div className="mt-3 flex flex-col gap-1">
-                    <div className={styles.modeToggleRow}>
-                      <label htmlFor="toggle-timed" className="text-xs" style={{ color: "#64748B" }}>Timed session</label>
-                      <input id="toggle-timed" type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} className="accent-[#F59E0B]" />
-                    </div>
-                    <div className={styles.modeToggleRow}>
-                      <label htmlFor="toggle-hints" className="text-xs" style={{ color: "#64748B" }}>Show hints</label>
-                      <input id="toggle-hints" type="checkbox" checked={hints} onChange={(e) => setHints(e.target.checked)} className="accent-[#F59E0B]" />
-                    </div>
-                    <div className={styles.modeToggleRow}>
-                      <label htmlFor="toggle-reveal" className="text-xs" style={{ color: "#64748B" }}>Reveal answers</label>
-                      <input id="toggle-reveal" type="checkbox" checked={revealAnswers} onChange={(e) => setRevealAnswers(e.target.checked)} className="accent-[#F59E0B]" />
-                    </div>
-                    <select
-                      className={styles.selectField}
-                      value={order}
-                      onChange={(e) => setOrder(e.target.value as PracticeOrder)}
-                      aria-label="Problem order"
-                    >
-                      <option value="listed">As listed</option>
-                      <option value="shuffled">Shuffled</option>
-                      <option value="difficulty">By difficulty</option>
-                    </select>
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming soon"
-                      className="mt-2 w-full min-h-[44px] rounded-lg font-semibold text-sm transition-colors"
-                      style={{ background: "#F59E0B", color: "#0F172A", opacity: 0.5, cursor: "not-allowed" }}
-                    >
-                      ▶ Start Practice
-                    </button>
-                  </div>
-                )}
               </div>
 
-              {/* Mode: Export */}
-              <div
-                className={cn(styles.modeCard, activeMode === "export" && styles.modeCardSelected)}
-                onClick={() => setActiveMode("export")}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    id="mode-export"
-                    name="active-mode"
-                    checked={activeMode === "export"}
-                    onChange={() => setActiveMode("export")}
-                    className="accent-[#F59E0B]"
-                  />
-                  <label htmlFor="mode-export" className="font-semibold text-sm cursor-pointer">
-                    📄 Create Training Material
-                  </label>
-                </div>
-
-                {activeMode === "export" && (
-                  <div className="mt-3 flex flex-col gap-1">
-                    <div className={styles.modeToggleRow}>
-                      <label htmlFor="toggle-answers" className="text-xs" style={{ color: "#64748B" }}>Include answers</label>
-                      <input id="toggle-answers" type="checkbox" checked={includeAnswers} onChange={(e) => setIncludeAnswers(e.target.checked)} className="accent-[#F59E0B]" />
-                    </div>
-                    <div className={styles.formatRow}>
-                      {FORMAT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setExportFormat(opt.value); }}
-                          className={cn(styles.formatBtn, exportFormat === opt.value && styles.formatBtnActive)}
-                        >
-                          {opt.label}
-                          <span className="text-[0.7rem] opacity-65 font-normal">{opt.ext}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); openExportModal(); }}
-                      className="mt-2 w-full min-h-[44px] rounded-lg font-semibold text-sm transition-colors"
-                      style={{ background: "#F59E0B", color: "#0F172A" }}
-                    >
-                      📄 Build Exam…
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming soon"
-                      className="mt-1 w-full min-h-[44px] rounded-lg font-semibold text-sm border transition-colors"
-                      style={{ borderColor: "#E2E8F0", color: "#64748B", opacity: 0.5, cursor: "not-allowed" }}
-                    >
-                      Preview
-                    </button>
+              {/* Mode: Export — always expanded (Practice coming soon) */}
+              <div className={cn(styles.modeCard, styles.modeCardSelected)}>
+                <p className="font-semibold text-sm mb-3" style={{ color: "#0F172A" }}>
+                  Create Training Material
+                </p>
+                <div className="flex flex-col gap-1">
+                  <div className={styles.modeToggleRow}>
+                    <label htmlFor="toggle-answers" className="text-xs" style={{ color: "#64748B" }}>Include answers</label>
+                    <input id="toggle-answers" type="checkbox" checked={includeAnswers} onChange={(e) => setIncludeAnswers(e.target.checked)} className="accent-[#F59E0B]" />
                   </div>
-                )}
+                  <div className={styles.formatRow}>
+                    {FORMAT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setExportFormat(opt.value)}
+                        className={cn(styles.formatBtn, exportFormat === opt.value && styles.formatBtnActive)}
+                      >
+                        {opt.label}
+                        <span className="text-[0.7rem] opacity-65 font-normal">{opt.ext}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openExportModal}
+                    className="mt-2 w-full min-h-[44px] rounded-lg font-semibold text-sm transition-colors"
+                    style={{ background: "#F59E0B", color: "#0F172A" }}
+                  >
+                    Build Exam…
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="mt-1 w-full min-h-[44px] rounded-lg font-semibold text-sm border transition-colors"
+                    style={{ borderColor: "#E2E8F0", color: "#64748B", opacity: 0.5, cursor: "not-allowed" }}
+                  >
+                    Preview
+                  </button>
+                </div>
               </div>
             </div>
           </div>
