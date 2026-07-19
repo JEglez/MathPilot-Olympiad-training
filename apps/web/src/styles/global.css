@@ -1,37 +1,20 @@
+@import './tokens.css';
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
-:root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
-  --color-tag-nt: #3b82f6;
-  --color-tag-geo: #10b981;
-  --color-tag-alg: #f59e0b;
-  --color-tag-comb: #8b5cf6;
-  --color-tag-nt-bg: #eff6ff;
-  --color-tag-geo-bg: #ecfdf5;
-  --color-tag-alg-bg: #fffbeb;
-  --color-tag-comb-bg: #f5f3ff;
-  --radius: 0.5rem;
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-}
-
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   background: var(--color-bg);
-  color: var(--color-text);
-  line-height: 1.6;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  font-size: var(--text-base);
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-secondary);
   text-decoration: none;
 }
 
@@ -41,8 +24,25 @@ a:hover {
 
 button {
   cursor: pointer;
+  font-family: inherit;
+}
+
+/* Global focus ring — keyboard nav */
+:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion preference — suppress non-essential animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .katex-display {
   overflow-x: auto;
 }
+

@@ -16,15 +16,16 @@
 }
 
 .bubble {
-  border-radius: 1rem;
+  border-radius: var(--radius);
   padding: 0.75rem 1rem;
-  font-size: 0.925rem;
+  font-size: var(--text-sm);
   line-height: 1.65;
   position: relative;
 }
 
 .user .bubble {
-  background: var(--color-primary);
+  /* Use btn-primary teal for user messages — interactive colour per spec */
+  background: var(--color-btn-primary);
   color: #fff;
   border-bottom-right-radius: 0.25rem;
 }
@@ -32,7 +33,7 @@
 .assistant .bubble {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -62,6 +63,7 @@
   animation: blink 1s step-end infinite;
 }
 
+/* Reduced-motion: blink suppressed by global prefers-reduced-motion rule */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -74,10 +76,10 @@
 }
 
 .chip {
-  font-size: 0.75rem;
-  background: #eff6ff;
-  color: var(--color-primary);
-  border: 1px solid #bfdbfe;
+  font-size: var(--text-xs);
+  background: #E3F0F7;
+  color: var(--color-secondary);
+  border: 1px solid #B3D4E8;
   border-radius: var(--radius);
   padding: 0.2rem 0.6rem;
   text-decoration: none;
@@ -88,6 +90,6 @@
 }
 
 .chip:hover {
-  background: #dbeafe;
+  background: #C8E3F0;
   text-decoration: none;
 }
