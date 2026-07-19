@@ -1,7 +1,7 @@
 # GitHub Actions workflow — MathPilot Azure Functions API deployment
 #
 # Required GitHub Secrets:
-#   AZURE_FUNCTIONAPP_PUBLISH_PROFILE  — publish profile XML from the Functions App
+#   AZURE_CREDENTIALS                  — service principal JSON for azure/login
 #   MATHPILOT_DB_URL                   — postgresql://... connection string
 #   MATHPILOT_OPENAI_ENDPOINT          — https://omm-mathpilot-openai.openai.azure.com/
 #   MATHPILOT_OPENAI_API_KEY           — Azure OpenAI key
@@ -61,11 +61,14 @@ jobs:
               MATHPILOT_CHAT_MODEL="${{ secrets.MATHPILOT_CLASSIFICATION_MODEL }}" \
             --output none
 
+      - name: Package functions for deployment
+        working-directory: functions
+        run: zip -r ../functions-deploy.zip . --exclude '*.ts' --exclude 'node_modules/.cache/*'
+
       - name: Deploy to Azure Functions
-        uses: Azure/functions-action@v1
-        with:
-          app-name: omm-mathpilot-api
-          package: functions
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
-          scm-do-build-during-deployment: false
-          respect-funcignore: true
+        run: |
+          az functionapp deployment source config-zip \
+            --name omm-mathpilot-api \
+            --resource-group rg-omm \
+            --src functions-deploy.zip \
+            --build-remote false
