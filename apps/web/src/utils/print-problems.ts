@@ -7,7 +7,10 @@ import { renderLatexToHtml } from "./render-latex";
 export type ExportFormat = "pdf" | "md" | "latex";
 
 export interface ExportOptions {
+  readonly organization: string;
   readonly title: string;
+  readonly date: string;
+  readonly instructions: string;
   readonly format: ExportFormat;
   readonly showAnswers: boolean;
   readonly problems: ProblemCard[];
@@ -25,85 +28,101 @@ export function exportProblems(opts: ExportOptions): void {
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
-function exportPdf({ title, showAnswers, problems }: ExportOptions): void {
-  const date = new Date().toLocaleDateString("en-US", {
-    year: "numeric", month: "long", day: "numeric",
-  });
-
+function exportPdf({ organization, title, date, instructions, showAnswers, problems }: ExportOptions): void {
   const problemsHtml = problems
     .map((p, i) => buildProblemHtml(p, i + 1, showAnswers))
     .join("\n");
 
+  const instrLines = instructions.trim()
+    ? instructions.trim().split("\n")
+        .map(l => `<li>${escapeHtml(l.trim())}</li>`)
+        .join("\n")
+    : "";
+
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    @page { margin: 2.8cm 3cm; }
+    @page { size: letter; margin: 2.5cm 2.8cm; }
 
     body {
-      font-family: "Georgia", "Times New Roman", serif;
+      font-family: "Times New Roman", "Georgia", serif;
       font-size: 11.5pt;
-      color: #111;
-      line-height: 1;
-      background: #fff;
+      color: #000;
+      line-height: 1.45;
     }
 
-    /* ── Cover ── */
-    .cover {
+    /* ── Header ── */
+    .header {
       text-align: center;
-      margin-bottom: 2.8rem;
-      padding-bottom: 1.2rem;
-      border-bottom: 2px solid #111;
+      margin-bottom: 1.2rem;
     }
-    .cover h1 {
-      font-size: 22pt;
+    .header .org {
+      font-size: 11.5pt;
       font-weight: 700;
-      letter-spacing: -0.01em;
-      margin-bottom: 0.4rem;
+      display: block;
+      margin-bottom: 0.15rem;
     }
-    .cover .date {
-      font-size: 10pt;
-      color: #555;
-      font-style: italic;
+    .header .exam-title {
+      font-size: 11.5pt;
+      font-weight: 400;
+      display: block;
+      margin-bottom: 0.15rem;
     }
+    .header .exam-date {
+      font-size: 11.5pt;
+      display: block;
+    }
+
+    /* ── Instructions ── */
+    .instructions {
+      margin: 0.9rem 0 1.4rem;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 0.55rem 0;
+    }
+    .instructions ul {
+      list-style: none;
+      padding: 0;
+    }
+    .instructions li {
+      font-size: 11pt;
+      line-height: 1.5;
+    }
+    .instructions li + li { margin-top: 0.1rem; }
 
     /* ── Problems ── */
     .problem {
-      margin-bottom: 2.6rem;
+      display: flex;
+      gap: 0.55em;
+      margin-bottom: 1.5rem;
       page-break-inside: avoid;
     }
-    .problem + .problem {
-      padding-top: 2rem;
-      border-top: 1px solid #ddd;
-    }
     .problem-num {
-      display: block;
       font-weight: 700;
-      font-size: 12.5pt;
-      margin-bottom: 0.65rem;
+      font-size: 11.5pt;
+      flex-shrink: 0;
+      min-width: 1.5em;
     }
-    .problem-statement {
-      line-height: 1.85;
+    .problem-body {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.7;
       font-size: 11.5pt;
     }
-    /* KaTeX display blocks — add breathing room */
-    .problem-statement .katex-display {
-      margin: 0.8rem 0;
+    .problem-body .katex-display {
+      margin: 0.6rem 0;
     }
-
-    /* ── Answer block ── */
     .problem-answer {
-      margin-top: 1rem;
-      padding: 0.5rem 0.9rem;
-      background: #f6f6f6;
+      margin-top: 0.7rem;
+      padding: 0.4rem 0.75rem;
+      background: #f5f5f5;
       border-left: 3px solid #555;
       font-size: 10.5pt;
-      line-height: 1.6;
     }
 
     @media print {
@@ -112,10 +131,12 @@ function exportPdf({ title, showAnswers, problems }: ExportOptions): void {
   </style>
 </head>
 <body>
-  <div class="cover">
-    <h1>${escapeHtml(title)}</h1>
-    <span class="date">${escapeHtml(date)}</span>
+  <div class="header">
+    ${organization ? `<span class="org">${escapeHtml(organization)}</span>` : ""}
+    <span class="exam-title">${escapeHtml(title)}</span>
+    <span class="exam-date">${escapeHtml(date)}</span>
   </div>
+  ${instrLines ? `<div class="instructions"><ul>${instrLines}</ul></div>` : ""}
   ${problemsHtml}
   <script>window.onload = () => window.print();<\/script>
 </body>
@@ -131,39 +152,39 @@ function buildProblemHtml(p: ProblemCard, num: number, showAnswers: boolean): st
   const statementHtml = renderLatexToHtml(p.statement);
   const answerBlock =
     showAnswers && p.answer
-      ? `<div class="problem-answer"><strong>Answer:</strong> ${renderLatexToHtml(p.answer)}</div>`
+      ? `<div class="problem-answer"><strong>Respuesta:</strong> ${renderLatexToHtml(p.answer)}</div>`
       : "";
   return `
 <div class="problem">
-  <span class="problem-num">Problem ${num}.</span>
-  <div class="problem-statement">${statementHtml}</div>
-  ${answerBlock}
+  <span class="problem-num">${num}.</span>
+  <div class="problem-body">${statementHtml}${answerBlock}</div>
 </div>`;
 }
 
 // ─── Markdown ─────────────────────────────────────────────────────────────────
 
-function exportMarkdown({ title, showAnswers, problems }: ExportOptions): void {
-  const date = new Date().toISOString().slice(0, 10);
-  const lines: string[] = [
-    `# ${title}`,
-    ``,
-    `*${date}*`,
-    ``,
-    `---`,
-    ``,
-  ];
+function exportMarkdown({ organization, title, date, instructions, showAnswers, problems }: ExportOptions): void {
+  const lines: string[] = [];
+
+  if (organization) lines.push(`# ${organization}`, ``);
+  lines.push(`## ${title}`, ``);
+  lines.push(`*${date}*`, ``);
+
+  if (instructions.trim()) {
+    lines.push(`---`, ``);
+    instructions.trim().split("\n").forEach(l => lines.push(l.trim()));
+    lines.push(``, `---`, ``);
+  }
+
+  lines.push(``);
 
   problems.forEach((p, i) => {
-    lines.push(`## Problem ${i + 1}`);
-    lines.push(``);
-    lines.push(p.statement);
+    lines.push(`**${i + 1}.** ${p.statement}`);
     lines.push(``);
     if (showAnswers && p.answer) {
-      lines.push(`> **Answer:** ${p.answer}`);
+      lines.push(`> **Respuesta:** ${p.answer}`);
       lines.push(``);
     }
-    lines.push(`---`);
     lines.push(``);
   });
 
@@ -172,17 +193,20 @@ function exportMarkdown({ title, showAnswers, problems }: ExportOptions): void {
 
 // ─── LaTeX ───────────────────────────────────────────────────────────────────
 
-function exportLatex({ title, showAnswers, problems }: ExportOptions): void {
-  const date = new Date().toLocaleDateString("en-US", {
-    year: "numeric", month: "long", day: "numeric",
-  });
+function exportLatex({ organization, title, date, instructions, showAnswers, problems }: ExportOptions): void {
+  const instrBlock = instructions.trim()
+    ? `\\begin{itemize}[noitemsep,topsep=2pt]\n` +
+      instructions.trim().split("\n")
+        .map(l => `  \\item ${latexEscape(l.trim())}`)
+        .join("\n") +
+      `\n\\end{itemize}\n`
+    : "";
 
   const problemBlocks = problems.map((p, i) => {
     const answerLine =
       showAnswers && p.answer
-        ? `\n\\medskip\n\\textbf{Answer:} ${latexEscape(p.answer)}\n`
+        ? `\n\\medskip\n\\textbf{Respuesta:} ${latexEscape(p.answer)}\n`
         : "";
-
     return [
       `\\begin{problem}{${i + 1}}`,
       ``,
@@ -193,25 +217,25 @@ function exportLatex({ title, showAnswers, problems }: ExportOptions): void {
   });
 
   const tex = `\\documentclass[12pt]{article}
-\\usepackage[margin=2cm]{geometry}
+\\usepackage[letterpaper, margin=2.5cm]{geometry}
 \\usepackage{amsmath,amssymb,amsthm}
+\\usepackage{enumitem}
 \\usepackage{parskip}
 
-% Problem environment
-\\newcounter{problemcounter}
+% Inline-numbered problem environment
 \\newenvironment{problem}[1]{%
-  \\stepcounter{problemcounter}%
-  \\medskip\\noindent\\textbf{Problem #1.}\\quad
-}{\\par}
+  \\noindent\\textbf{#1.}\\enspace
+}{\\par\\medskip}
 
 \\begin{document}
 
 \\begin{center}
-  {\\LARGE\\bfseries ${latexEscape(title)}}\\\\[0.4em]
-  {\\normalsize ${latexEscape(date)}}
+${organization ? `  {\\textbf{${latexEscape(organization)}}}\\\\[0.15em]\n` : ""
+}  {${latexEscape(title)}}\\\\[0.15em]
+  {${latexEscape(date)}}
 \\end{center}
 
-\\bigskip
+${instrBlock ? `\\vspace{0.4em}\\hrule\\vspace{0.4em}\n${instrBlock}\\hrule\\vspace{1em}` : "\\vspace{1em}"}
 
 ${problemBlocks.join("\n\n")}
 

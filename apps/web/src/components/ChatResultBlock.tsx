@@ -26,7 +26,12 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; ext: string }[] = [
 export function ChatResultBlock({ mode, summary, showAnswers, problems }: Props) {
   const [approved, setApproved] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
+  const [organization, setOrganization] = useState("");
   const [docTitle, setDocTitle] = useState("");
+  const [docDate, setDocDate] = useState(() =>
+    new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  );
+  const [instructions, setInstructions] = useState("");
   const [format, setFormat] = useState<ExportFormat>("pdf");
 
   function toggleApprove(id: string) {
@@ -46,7 +51,15 @@ export function ChatResultBlock({ mode, summary, showAnswers, problems }: Props)
   function handleGenerate() {
     if (!docTitle.trim()) return;
     const selected = problems.filter((p) => approved.has(p.id));
-    exportProblems({ title: docTitle.trim(), format, showAnswers, problems: selected });
+    exportProblems({
+      organization: organization.trim(),
+      title: docTitle.trim(),
+      date: docDate.trim(),
+      instructions: instructions.trim(),
+      format,
+      showAnswers,
+      problems: selected,
+    });
     setShowModal(false);
   }
 
@@ -105,18 +118,52 @@ export function ChatResultBlock({ mode, summary, showAnswers, problems }: Props)
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>Export problems</h3>
 
+            <label className={styles.modalLabel} htmlFor="doc-org">
+              Organization <span className={styles.optional}>(optional)</span>
+            </label>
+            <input
+              id="doc-org"
+              className={styles.modalInput}
+              type="text"
+              placeholder="e.g. Comité Estatal de Olimpiadas de Matemáticas"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+            />
+
             <label className={styles.modalLabel} htmlFor="doc-title">
-              Document title
+              Exam title *
             </label>
             <input
               id="doc-title"
               className={styles.modalInput}
               type="text"
-              placeholder="e.g. Number Theory Exam – July 2025"
+              placeholder="e.g. Primer examen para la 40 OMM"
               value={docTitle}
               onChange={(e) => setDocTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
               autoFocus
+            />
+
+            <label className={styles.modalLabel} htmlFor="doc-date">
+              Date
+            </label>
+            <input
+              id="doc-date"
+              className={styles.modalInput}
+              type="text"
+              value={docDate}
+              onChange={(e) => setDocDate(e.target.value)}
+            />
+
+            <label className={styles.modalLabel} htmlFor="doc-instructions">
+              Instructions <span className={styles.optional}>(one per line, optional)</span>
+            </label>
+            <textarea
+              id="doc-instructions"
+              className={styles.modalTextarea}
+              rows={4}
+              placeholder={"Tiempo límite: 4.5 horas.\nEscribe todos los razonamientos.\nNo puedes usar calculadora."}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
             />
 
             <span className={styles.modalLabel}>Format</span>
