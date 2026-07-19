@@ -1,9 +1,8 @@
-import { BookOpen, MessageSquare, Search, Sigma } from "lucide-react";
+import { MessageSquare, Search, Sigma } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
 import { cn } from "./lib/utils";
-import { BrowsePage } from "./pages/BrowsePage";
 import { ChatPage } from "./pages/ChatPage";
 import { ProblemDetailPage } from "./pages/ProblemDetailPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -12,7 +11,6 @@ type LucideIcon = ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttrib
 
 const NAV_ITEMS: Array<{ to: string; end?: boolean; icon: LucideIcon; label: string }> = [
   { to: "/", end: true, icon: Search, label: "Search" },
-  { to: "/browse", icon: BookOpen, label: "Browse" },
   { to: "/chat", icon: MessageSquare, label: "Chat" },
 ];
 
@@ -104,7 +102,6 @@ export function App() {
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<SearchPage />} />
-              <Route path="/browse" element={<BrowsePage />} />
               <Route path="/problems/:id" element={<ProblemDetailPage />} />
               <Route path="/chat" element={<ChatPage />} />
             </Routes>
