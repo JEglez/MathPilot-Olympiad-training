@@ -2,6 +2,10 @@
 // Lightweight planning agent — hooks + plan review only.
 // Governance docs live in docs/governance/*.md and are read via the
 // built-in view tool. No embedded skill tools.
+//
+// Agent routing: this extension auto-detects planning/design/UI intent and
+// injects the relevant governance context. For scaffold/boilerplate intent,
+// it defers to the mathpilot-codegen agent (mathpilot_scaffold tool).
 
 import { joinSession } from "@github/copilot-sdk/extension";
 
@@ -27,6 +31,7 @@ If it's a **service**, read the relevant governance docs with the view tool:
 | Coding Standards | docs/governance/coding-standards.md |
 | Testing Standards | docs/governance/testing-standards.md |
 | AI Guidelines | docs/governance/ai-guidelines.md |
+| **UI/UX Constitution** | **docs/governance/ui-ux-constitution.md** |
 | Domain Model | docs/domain-model.md |
 | Taxonomy | docs/taxonomy.md |
 
@@ -39,9 +44,30 @@ Structure your plan as:
 6. **Type design** — branded IDs, discriminated unions, Zod schemas (service only)
 7. **Error handling** — Result<T, E> types (service) or throw/exit (script)
 8. **Testing strategy** — read testing-standards.md, plan tests/factories
-9. **AI considerations** — if applicable: read ai-guidelines.md
-10. **ADR needed?** — flag if Architecture Decision Record is required
-11. **Performance & cost** — budget impact and optimization notes
+9. **UI/UX compliance** — if any React/UI code: read ui-ux-constitution.md, list responsive rules that apply
+10. **AI considerations** — if applicable: read ai-guidelines.md
+11. **ADR needed?** — flag if Architecture Decision Record is required
+12. **Performance & cost** — budget impact and optimization notes
+13. **Scaffold with codegen?** — list mathpilot_scaffold calls needed (template + params) for each entity/component/handler
+`;
+
+// ─── Agent routing context ─────────────────────────────────────────────────
+
+const AGENT_ROUTING_HINT = `
+## MathPilot Custom Agents — Routing Guide
+
+Two project agents are available. Invoke them proactively.
+
+| Agent / Tool | Best for | Trigger phrases |
+|---|---|---|
+| **mathpilot_plan_review** (this tool) | Review a written plan for governance violations | "review this plan", "check compliance", "does this violate" |
+| **mathpilot_scaffold** (codegen agent) | Generate boilerplate for a new entity/component/handler | "scaffold", "generate", "create a component", "new entity", "new handler" |
+| **mathpilot_list_templates** (codegen agent) | See available scaffold templates | "what templates", "what can codegen make" |
+
+### Recommended sequence for new features
+1. Write your plan → call \`mathpilot_plan_review\` → fix violations
+2. Call \`mathpilot_scaffold\` for each new file (entity, handler, component, use-case)
+3. Fill in the generated TODO stubs with real logic
 `;
 
 
@@ -50,11 +76,14 @@ Structure your plan as:
 const session = await joinSession({
     hooks: {
         onSessionStart: async () => {
-            await session.log("MathPilot Planner loaded — governance docs in docs/governance/");
+            await session.log("MathPilot Planner loaded — governance docs in docs/governance/ (incl. ui-ux-constitution.md)");
         },
 
         onUserPromptSubmitted: async (input) => {
             const prompt = input.prompt.toLowerCase();
+            const parts = [];
+
+            // ── Planning / design intent ───────────────────────────────────
             const isPlanningRequest =
                 prompt.includes("plan") ||
                 prompt.includes("design") ||
@@ -68,10 +97,46 @@ const session = await joinSession({
                 prompt.includes("setup");
 
             if (isPlanningRequest) {
-                return { additionalContext: PLANNING_TEMPLATE };
+                parts.push(PLANNING_TEMPLATE);
             }
 
-            return undefined;
+            // ── UI / responsive / component intent ─────────────────────────
+            const isUIRequest =
+                prompt.includes("component") ||
+                prompt.includes("responsive") ||
+                prompt.includes("mobile") ||
+                prompt.includes("layout") ||
+                prompt.includes("page") ||
+                prompt.includes("ui ") ||
+                prompt.includes(" ui") ||
+                prompt.includes("sidebar") ||
+                prompt.includes("nav") ||
+                prompt.includes("button") ||
+                prompt.includes("form") ||
+                prompt.includes(".tsx") ||
+                prompt.includes(".module.css");
+
+            if (isUIRequest) {
+                parts.push(
+                    "> **UI/UX Constitution:** This prompt involves UI/frontend work. " +
+                    "Read `docs/governance/ui-ux-constitution.md` before editing or creating " +
+                    "any `.tsx` or `.module.css` file. Key rules: `px-4 sm:px-6` padding, " +
+                    "44px touch targets, mobile-first responsive layout, no hardcoded colours."
+                );
+            }
+
+            // ── Scaffold / codegen intent — defer to codegen agent ─────────
+            const isScaffoldRequest =
+                (prompt.includes("scaffold") || prompt.includes("generate boilerplate") || prompt.includes("new entity") || prompt.includes("new handler")) &&
+                !prompt.includes("plan");
+
+            if (isScaffoldRequest) {
+                parts.push(AGENT_ROUTING_HINT);
+            }
+
+            return parts.length > 0
+                ? { additionalContext: parts.join("\n\n---\n\n") }
+                : undefined;
         },
 
         onPreToolUse: async (input) => {
@@ -176,6 +241,26 @@ const session = await joinSession({
                 }
                 if (plan.includes("throw") && !plan.includes("result<") && !plan.includes("result type") && !plan.includes("script")) {
                     warnings.push("CODING [§6]: Prefer Result<T, E> over thrown exceptions (unless this is an operational script — see architecture-principles.md §11).");
+                }
+
+                // UI/UX constitution checks
+                if ((plan.includes("px-6") || plan.includes("padding: 24") || plan.includes("padding: 1.5rem")) && !plan.includes("sm:px-6") && !plan.includes("responsive")) {
+                    violations.push("UI/UX [§3.2]: Page padding must be responsive: `px-4 sm:px-6` — never bare `px-6`.");
+                }
+                if (plan.includes("fixed") && plan.includes("sidebar") && !plan.includes("mobile") && !plan.includes("hamburger") && !plan.includes("toggle")) {
+                    violations.push("UI/UX [§3.3]: Fixed sidebar requires a mobile hamburger toggle and overlay drawer.");
+                }
+                if (plan.includes("div onclick") || plan.includes("<div") && plan.includes("onclick")) {
+                    violations.push("UI/UX [§4.2]: Use <button type=\"button\"> for interactive elements — never <div onClick>.");
+                }
+                if ((plan.includes("inline style") || plan.includes("style={{")) && !plan.includes("dynamic")) {
+                    warnings.push("UI/UX [§5.2]: Prefer CSS tokens and Tailwind classes over inline styles. Inline styles are only allowed for dynamic values.");
+                }
+                if (plan.includes("katex") && !plan.includes("renderlatextohtml") && !plan.includes("render-latex")) {
+                    violations.push("UI/UX [§8]: LaTeX must be rendered via renderLatexToHtml() — no direct KaTeX calls in feature code.");
+                }
+                if (plan.includes("grid") && !plan.includes("grid-cols-1") && !plan.includes("mobile") && !plan.includes("responsive")) {
+                    warnings.push("UI/UX [§3.2]: Multi-column grids must collapse to grid-cols-1 at md: breakpoint.");
                 }
 
                 let report = "# Plan Compliance Report\n\n";

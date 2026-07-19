@@ -104,7 +104,7 @@ export function SearchPage() {
     <div className="flex flex-col min-h-screen">
       {/* ── Sticky topbar with search ── */}
       <div
-        className="sticky top-0 z-10 px-6 py-3"
+        className="sticky top-0 z-10 px-4 sm:px-6 py-3"
         style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}
       >
         <div className="relative max-w-2xl">
@@ -252,7 +252,7 @@ export function SearchPage() {
       </div>
 
       {/* ── Results ── */}
-      <div className="flex-1 px-6 pb-8 pt-4 space-y-2">
+      <div className="flex-1 px-4 sm:px-6 pb-8 pt-4 space-y-2">
         {!isLoading && results.length > 0 && (
           <ul className="space-y-2 list-none p-0 m-0">
             {results.map((p, i) => (

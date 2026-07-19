@@ -1,10 +1,80 @@
 // Extension: mathpilot-codegen
 // Code generation agent that scaffolds compliant boilerplate following all
 // MathPilot project standards. Reads governance docs for up-to-date rules.
+//
+// Agent routing: this extension auto-detects scaffold intent in every prompt
+// and injects the appropriate template guidance. For planning/design intent,
+// it defers to the mathpilot-planner agent (mathpilot_plan_review tool).
 
 import { joinSession } from "@github/copilot-sdk/extension";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
+
+// ─── UI/UX quick-reference (from docs/governance/ui-ux-constitution.md) ──────
+
+const UI_UX_RULES = `
+## UI/UX Constitution — Quick Reference (full doc: docs/governance/ui-ux-constitution.md)
+
+### Responsive padding (MANDATORY)
+- Page padding: px-4 sm:px-6  ← NEVER bare px-6
+- Touch targets: min-h-[44px] on all buttons/links
+
+### Tokens — never hardcode these
+- Background: #F8F9FC  → use bg-[--color-background] or bg-[#F8F9FC] only as dynamic inline style
+- Border: #E2E8F0      → use border-[--color-border]
+- Amber accent: #F59E0B → --color-ring / --color-teal
+- Primary dark: #0F172A → --color-primary
+
+### Responsive sidebar pattern
+- Desktop: fixed left sidebar, ml-56 on main content
+- Mobile: hamburger button → slide-in drawer + overlay backdrop
+- Mobile top bar height: 52px  →  sticky content below it uses top-[52px] md:top-0
+
+### Grid collapse rule
+- Every multi-column grid must have: @media (max-width: 768px) { grid-template-columns: 1fr }
+
+### react-component scaffold must produce
+1. ComponentName.tsx  +  ComponentName.module.css (both files, always)
+2. Mobile media query block in the .module.css
+3. data-testid on the root element
+4. aria-label on icon-only buttons
+5. Named readonly props interface
+6. cn() for conditional classes (import from ../lib/utils)
+7. <button type="button"> for interactive divs — NEVER <div onClick>
+
+### LaTeX
+- Always use renderLatexToHtml() from utils/render-latex — never raw KaTeX
+- Math containers need overflow-x: auto
+
+### Accessibility
+- Focus ring: focus-visible:ring-2 focus-visible:ring-[#F59E0B]
+- Semantic HTML: <nav>, <main>, <aside>, <section>, <button>, <a>
+- WCAG 2.2 AA contrast minimum
+`;
+
+// ─── Agent routing context ────────────────────────────────────────────────────
+
+const AGENT_ROUTING_HINT = `
+## MathPilot Custom Agents — Routing Guide
+
+Two project agents are available. Use them proactively instead of generating
+boilerplate manually or designing ad-hoc:
+
+| Agent / Tool | Best for | Example triggers |
+|---|---|---|
+| **mathpilot_scaffold** (this tool) | Boilerplate, scaffolding, new files | "scaffold", "generate", "create a component", "add a handler", "new entity", "new migration" |
+| **mathpilot_plan_review** (planner) | Design, architecture, feature planning | "plan", "design", "architect", "implement feature", "set up", "add feature", "review plan" |
+| **mathpilot_list_templates** (this tool) | List what scaffold templates exist | "what templates", "list scaffolds", "what can codegen do" |
+
+### Typical workflow for a new feature
+1. Call mathpilot_plan_review with your written plan → fix violations
+2. Call mathpilot_scaffold for each entity / handler / component / use-case
+3. Fill in the generated TODO stubs
+
+### When to NOT use scaffold
+- Editing existing files → use edit tool directly (but read the UI/UX constitution first for UI files)
+- Writing tests for existing code → write manually, co-locate next to the file under test
+`;
 
 // ─── Template registry ─────────────────────────────────────────────────────
 
@@ -415,24 +485,106 @@ describe("${adapterName}", () => {
 
 function generateReactComponent(args) {
     const { name, type } = args;
+    // Pages live in pages/, feature components in components/, primitives in components/ui/
     const subdir =
-        type === "page" ? "pages" : type === "feature" ? "features" : "components";
+        type === "page" ? "pages" : type === "primitive" ? "components/ui" : "components";
     const filePath = `src/ui/${subdir}/${name}.tsx`;
+    const cssPath  = `src/ui/${subdir}/${name}.module.css`;
     const testPath = `src/ui/${subdir}/${name}.test.tsx`;
+    const kebab = toKebab(name);
+
+    // Decide layout shape based on component type
+    const isPage = type === "page";
 
     const content = `// ${filePath}
-// ${type || "component"} — functional component with TypeScript props
+// ${type || "component"} — functional component following ui-ux-constitution.md
+// Rules: responsive px-4 sm:px-6 padding, 44px touch targets, cn() for conditionals,
+//        data-testid on root, named readonly props, no <div onClick>.
+
+import styles from "./${name}.module.css";
+import { cn } from "${isPage ? "../../lib/utils" : "../lib/utils"}";
 
 export interface ${name}Props {
   // TODO(#issue): Define props
+  readonly className?: string;
 }
 
-export function ${name}(props: ${name}Props): JSX.Element {
+export function ${name}({ className }: ${name}Props) {
   return (
-    <div data-testid="${toKebab(name)}">
-      {/* TODO(#issue): Implement component */}
+    <div
+      className={cn(styles.root, className)}
+      data-testid="${kebab}"
+    >
+      {/* TODO(#issue): Implement ${name} */}
     </div>
   );
+}
+`;
+
+    // CSS module — always includes a responsive block
+    const cssContent = isPage
+        ? `/* ${cssPath} */
+/* ui-ux-constitution.md §6 — CSS Modules rules */
+
+.root {
+  /* Page-level layout */
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* ── Topbar ─────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  /* Mobile: account for the 52px App mobile nav bar          */
+  /* top: 52px;  md:top: 0 — add if content sits under nav    */
+  padding: 0.75rem 1rem;           /* px-4 py-3 */
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ── Content area ─────────────────────────────────────────── */
+.content {
+  flex: 1;
+  padding: 1rem 1rem;              /* px-4 py-4 */
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 639px) {       /* below sm: */
+  .topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .content {
+    padding: 1rem 1rem;
+  }
+}
+
+/* ── Tablet / Desktop ─────────────────────────────────────── */
+@media (min-width: 640px) {       /* sm: */
+  .topbar {
+    padding: 0.75rem 1.5rem;       /* sm:px-6 */
+  }
+
+  .content {
+    padding: 1.5rem 1.5rem;        /* sm:px-6 sm:py-6 */
+  }
+}
+`
+        : `/* ${cssPath} */
+/* ui-ux-constitution.md §6 — CSS Modules rules */
+
+.root {
+  /* TODO(#issue): define layout */
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {       /* below md: */
+  .root {
+    /* TODO(#issue): override for mobile */
+  }
 }
 `;
 
@@ -442,19 +594,33 @@ import { render, screen } from "@testing-library/react";
 import { ${name} } from "./${name}";
 
 describe("${name}", () => {
-  it("renders without crashing", () => {
+  it("renders root element with correct testid", () => {
     render(<${name} />);
-    expect(screen.getByTestId("${toKebab(name)}")).toBeDefined();
+    expect(screen.getByTestId("${kebab}")).toBeDefined();
+  });
+
+  it("forwards extra className", () => {
+    render(<${name} className="extra" />);
+    const el = screen.getByTestId("${kebab}");
+    expect(el.className).toContain("extra");
   });
 });
 `;
 
     return {
         files: [
-            { path: filePath, content },
-            { path: testPath, content: testContent },
+            { path: filePath,  content },
+            { path: cssPath,   content: cssContent },
+            { path: testPath,  content: testContent },
         ],
-        summary: `React ${type || "component"} \`${name}\` scaffolded in \`${filePath}\` with data-testid and co-located test.`,
+        summary:
+            `React ${type || "component"} \`${name}\` scaffolded in \`${filePath}\` ` +
+            `with responsive CSS module, data-testid, and co-located test.\n\n` +
+            `📋 **UI/UX Constitution reminders:**\n` +
+            `- Page padding: \`px-4 sm:px-6\` — already in generated CSS module\n` +
+            `- Touch targets: add \`min-h-[44px]\` to all buttons you add\n` +
+            `- Use \`cn()\` for conditional Tailwind classes\n` +
+            `- Full rules: \`docs/governance/ui-ux-constitution.md\``,
     };
 }
 
@@ -704,7 +870,160 @@ const GENERATORS = {
 const session = await joinSession({
     hooks: {
         onSessionStart: async () => {
-            await session.log("MathPilot CodeGen loaded — 8 scaffolding templates available (incl. script)");
+            await session.log("MathPilot CodeGen loaded — 8 scaffolding templates + UI/UX constitution enforcement");
+        },
+
+        // ── Agent auto-routing: detect intent and inject guidance ──────────
+        onUserPromptSubmitted: async (input) => {
+            const prompt = input.prompt.toLowerCase();
+            const parts = [];
+
+            // ── Scaffold / codegen intent ──────────────────────────────────
+            const isScaffoldIntent =
+                prompt.includes("scaffold") ||
+                prompt.includes("generate") ||
+                prompt.includes("boilerplate") ||
+                prompt.includes("template") ||
+                (prompt.includes("create") && (
+                    prompt.includes("component") ||
+                    prompt.includes("handler") ||
+                    prompt.includes("entity") ||
+                    prompt.includes("use case") ||
+                    prompt.includes("migration") ||
+                    prompt.includes("adapter") ||
+                    prompt.includes("factory")
+                )) ||
+                (prompt.includes("new") && (
+                    prompt.includes("component") ||
+                    prompt.includes("page") ||
+                    prompt.includes("api") ||
+                    prompt.includes("endpoint")
+                )) ||
+                prompt.includes("add a handler") ||
+                prompt.includes("add a component");
+
+            if (isScaffoldIntent) {
+                parts.push(AGENT_ROUTING_HINT);
+            }
+
+            // ── UI / responsive / design intent ───────────────────────────
+            const isUIIntent =
+                prompt.includes("component") ||
+                prompt.includes("responsive") ||
+                prompt.includes("mobile") ||
+                prompt.includes("layout") ||
+                prompt.includes("css") ||
+                prompt.includes("style") ||
+                prompt.includes("design") ||
+                prompt.includes("ui") ||
+                prompt.includes("page") ||
+                prompt.includes("button") ||
+                prompt.includes("form") ||
+                prompt.includes("modal") ||
+                prompt.includes("sidebar") ||
+                prompt.includes("nav") ||
+                prompt.includes(".tsx") ||
+                prompt.includes(".module.css");
+
+            if (isUIIntent) {
+                parts.push(UI_UX_RULES);
+            }
+
+            // ── Planning intent — remind about the planner agent ───────────
+            const isPlanningIntent =
+                prompt.includes("plan ") ||
+                prompt.includes("design a") ||
+                prompt.includes("architect") ||
+                prompt.includes("implement feature") ||
+                prompt.includes("add feature") ||
+                prompt.includes("set up") ||
+                prompt.includes("how should i");
+
+            if (isPlanningIntent && !isScaffoldIntent) {
+                parts.push(
+                    "\n> **Planner agent:** This looks like a design/planning request. " +
+                    "Consider calling `mathpilot_plan_review` with your plan first to check " +
+                    "compliance before writing code (docs/governance/constitution.md §3)."
+                );
+            }
+
+            return parts.length > 0
+                ? { additionalContext: parts.join("\n\n---\n\n") }
+                : undefined;
+        },
+
+        // ── File-level rules injection based on path ───────────────────────
+        onPreToolUse: async (input) => {
+            if (input.toolName !== "create" && input.toolName !== "edit") {
+                return undefined;
+            }
+
+            const path = String(input.toolArgs?.path || "");
+
+            // UI files — inject UI/UX constitution
+            if (
+                path.endsWith(".tsx") ||
+                path.endsWith(".module.css") ||
+                path.includes("/components/") ||
+                path.includes("\\components\\") ||
+                path.includes("/pages/") ||
+                path.includes("\\pages\\")
+            ) {
+                return {
+                    additionalContext:
+                        "UI FILE: Enforce ui-ux-constitution.md. Key rules:\n" +
+                        "  1. Page padding: px-4 sm:px-6 — never bare px-6\n" +
+                        "  2. Every .tsx component needs a co-located .module.css with a @media (max-width: 768px) block if it uses columns\n" +
+                        "  3. Touch targets: min-h-[44px] on all buttons\n" +
+                        "  4. No <div onClick> — use <button type=\"button\">\n" +
+                        "  5. No hardcoded hex colours — use CSS tokens or Tailwind theme classes\n" +
+                        "  6. LaTeX: only via renderLatexToHtml() from utils/render-latex\n" +
+                        "  Full doc: docs/governance/ui-ux-constitution.md",
+                };
+            }
+
+            // Scripts — exempt from DDD (architecture-principles.md §11)
+            const isScript = path.includes("/scripts/") || path.includes("\\scripts\\");
+            if (isScript) {
+                return {
+                    additionalContext:
+                        "SCRIPT MODE: flat structure applies. DDD layers, Result<T,E>, and branded IDs " +
+                        "are NOT required. Still required: env vars for secrets, Zod for external data, " +
+                        "idempotency, exit code 1 on failure. See docs/governance/architecture-principles.md §11.",
+                };
+            }
+
+            // Domain layer
+            if (path.includes("/domain/") || path.includes("\\domain\\")) {
+                return {
+                    additionalContext:
+                        "RULE CHECK: Domain layer file — ZERO external dependencies allowed. " +
+                        "Read docs/governance/architecture-principles.md §1 if unsure.",
+                };
+            }
+
+            // API handlers
+            if (path.includes("/api/") || path.includes("\\api\\")) {
+                return {
+                    additionalContext:
+                        "RULE CHECK: API handler — no business logic, delegate to application layer. " +
+                        "Read docs/governance/architecture-principles.md §1, §3.",
+                };
+            }
+
+            // AI infrastructure adapters
+            if (
+                (path.includes("/ai/") || path.includes("\\ai\\")) &&
+                (path.includes("/infrastructure/") || path.includes("\\infrastructure\\"))
+            ) {
+                return {
+                    additionalContext:
+                        "RULE CHECK: AI adapter — wrap behind domain interface, config-based model IDs. " +
+                        "Read docs/governance/ai-guidelines.md.",
+                };
+            }
+
+            return undefined;
         },
     },
 
