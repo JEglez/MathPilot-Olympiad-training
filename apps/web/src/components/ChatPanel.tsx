@@ -34,7 +34,7 @@ export function ChatPanel({ filters }: Props) {
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 120px)", minHeight: 400 }}>
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="text-4xl mb-4">✦</div>
@@ -62,7 +62,7 @@ export function ChatPanel({ filters }: Props) {
       </div>
 
       {/* Input form */}
-      <div className="px-6 pb-6 pt-2" style={{ borderTop: "1px solid #E5E7EB" }}>
+      <div className="px-4 sm:px-6 pb-6 pt-2" style={{ borderTop: "1px solid #E5E7EB" }}>
         <form onSubmit={handleSubmit} className="flex gap-3 items-end">
           <textarea
             ref={inputRef}
