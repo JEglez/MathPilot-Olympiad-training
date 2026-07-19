@@ -3,22 +3,38 @@ import { useSearchParams } from "react-router-dom";
 import { cn } from "../lib/utils";
 import type { SearchFilters, TopicNode } from "../services/api";
 import { getTaxonomy } from "../services/api";
+import { MultiSelectDropdown } from "../components/MultiSelectDropdown";
 import { Pagination } from "../components/Pagination";
 import { ProblemCard } from "../components/ProblemCard";
 import { useSearch } from "../hooks/useSearch";
 
-const LEVELS = ["local", "state", "national", "international"] as const;
+const LEVELS = [
+  { value: "local",         label: "Local" },
+  { value: "state",         label: "State" },
+  { value: "national",      label: "National" },
+  { value: "international", label: "International" },
+];
+
+const COMPETITIONS = [
+  { value: "IMO",       label: "IMO — International Mathematical Olympiad" },
+  { value: "USAMO",     label: "USAMO — US Mathematical Olympiad" },
+  { value: "AIME",      label: "AIME — American Invitational" },
+  { value: "AMC 10",    label: "AMC 10" },
+  { value: "AMC 12",    label: "AMC 12" },
+  { value: "APMO",      label: "APMO — Asia Pacific" },
+  { value: "Putnam",    label: "Putnam" },
+  { value: "HMMT",      label: "HMMT" },
+  { value: "PUMAC",     label: "PUMAC" },
+  { value: "MathLeague",label: "MathLeague" },
+];
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [topics, setTopics] = useState<TopicNode[]>([]);
+  const [topicNodes, setTopicNodes] = useState<TopicNode[]>([]);
   const [inputValue, setInputValue] = useState(searchParams.get("q") ?? "");
 
-  // Load taxonomy for domain tabs
   useEffect(() => {
-    getTaxonomy()
-      .then((t) => setTopics(t.topics))
-      .catch(() => {});
+    getTaxonomy().then((t) => setTopicNodes(t.topics)).catch(() => {});
   }, []);
 
   const filters: SearchFilters = useMemo(() => ({
@@ -46,7 +62,7 @@ export function SearchPage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Debounced search
+  // Debounced search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters({ ...filters, q: inputValue.trim() || undefined, page: 1 });
@@ -55,19 +71,38 @@ export function SearchPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue]);
 
-  function setTopic(code: string | undefined) {
-    setFilters({ ...filters, topics: code ? [code] : undefined, page: 1 });
+  // Topic multiselect toggle
+  function toggleTopic(code: string) {
+    const current = filters.topics ?? [];
+    const next = current.includes(code) ? current.filter((c) => c !== code) : [...current, code];
+    setFilters({ ...filters, topics: next.length > 0 ? next : undefined, page: 1 });
   }
 
-  function setLevel(level: string | undefined) {
-    setFilters({ ...filters, level, page: 1 });
+  // Level multiselect — API supports single string; send comma-joined for display, first value to API
+  // We store as comma-joined in the level param
+  const selectedLevels = filters.level ? filters.level.split(",").filter(Boolean) : [];
+  function toggleLevel(value: string) {
+    const next = selectedLevels.includes(value)
+      ? selectedLevels.filter((v) => v !== value)
+      : [...selectedLevels, value];
+    setFilters({ ...filters, level: next.length > 0 ? next.join(",") : undefined, page: 1 });
   }
 
-  const activeTopicCode = filters.topics?.[0];
+  // Competition multiselect — API is single string; store comma-joined
+  const selectedCompetitions = filters.competition ? filters.competition.split(",").filter(Boolean) : [];
+  function toggleCompetition(value: string) {
+    const next = selectedCompetitions.includes(value)
+      ? selectedCompetitions.filter((v) => v !== value)
+      : [...selectedCompetitions, value];
+    setFilters({ ...filters, competition: next.length > 0 ? next.join(",") : undefined, page: 1 });
+  }
+
+  const activeTopics = filters.topics ?? [];
+  const hasAnyFilter = activeTopics.length > 0 || selectedLevels.length > 0 || selectedCompetitions.length > 0 || filters.year_min || filters.year_max;
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* ── Top search bar ── */}
+      {/* ── Sticky topbar with search ── */}
       <div
         className="sticky top-0 z-10 px-6 py-3"
         style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}
@@ -84,94 +119,136 @@ export function SearchPage() {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Search olympiad problems…"
             className="w-full h-10 rounded-xl text-sm font-medium pl-9 pr-4 outline-none transition-all"
-            style={{
-              background: "#F8F9FC",
-              border: "1.5px solid #E2E8F0",
-              color: "#0F172A",
-            }}
+            style={{ background: "#F8F9FC", border: "1.5px solid #E2E8F0", color: "#0F172A" }}
             onFocus={(e) => { e.currentTarget.style.borderColor = "#F59E0B"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(245,158,11,0.1)"; }}
             onBlur={(e)  => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.boxShadow = "none"; }}
           />
         </div>
       </div>
 
-      {/* ── Domain tabs ── */}
-      <div
-        className="px-6 pt-4 pb-2"
-        style={{ background: "#F8F9FC" }}
-      >
-        <div
-          className="flex gap-1 p-1 w-fit rounded-xl"
-          style={{ background: "#F1F5F9", border: "1px solid #E2E8F0" }}
-        >
+      {/* ── Domain multiselect pills ── */}
+      <div className="px-6 pt-4 pb-0" style={{ background: "#F8F9FC" }}>
+        <div className="flex flex-wrap gap-1.5 mb-3">
           <button
             type="button"
-            onClick={() => setTopic(undefined)}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap",
-              !activeTopicCode
-                ? "text-amber-700"
-                : "text-slate-500 hover:text-slate-800"
-            )}
-            style={!activeTopicCode ? { background: "#0F172A", color: "#F59E0B", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" } : {}}
+            onClick={() => setFilters({ ...filters, topics: undefined, page: 1 })}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={activeTopics.length === 0
+              ? { background: "#0F172A", color: "#F59E0B", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }
+              : { background: "#F1F5F9", color: "#64748B", border: "1px solid #E2E8F0" }}
           >
             All
           </button>
-          {topics.slice(0, 6).map((t) => (
-            <button
-              key={t.code}
-              type="button"
-              onClick={() => setTopic(t.code)}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap",
-                activeTopicCode === t.code
-                  ? "text-amber-700"
-                  : "text-slate-500 hover:text-slate-800"
-              )}
-              style={activeTopicCode === t.code ? { background: "#0F172A", color: "#F59E0B", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" } : {}}
-            >
-              {t.name.replace("Number Theory", "NT").replace("Combinatorics", "Comb.")}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Filter chips ── */}
-        <div className="flex flex-wrap gap-2 mt-3">
-          {LEVELS.map((lvl) => {
-            const active = filters.level === lvl;
+          {topicNodes.map((t) => {
+            const active = activeTopics.includes(t.code);
             return (
               <button
-                key={lvl}
+                key={t.code}
                 type="button"
-                onClick={() => setLevel(active ? undefined : lvl)}
-                className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                style={{
-                  background: active ? "#FFFBEB" : "#fff",
-                  color: active ? "#92400E" : "#64748B",
-                  border: active ? "1.5px solid #FCD34D" : "1.5px solid #E2E8F0",
-                }}
+                onClick={() => toggleTopic(t.code)}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-all")}
+                style={active
+                  ? { background: "#0F172A", color: "#F59E0B", boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }
+                  : { background: "#F1F5F9", color: "#64748B", border: "1px solid #E2E8F0" }}
               >
-                {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
-                {active && <span className="ml-1 opacity-60">×</span>}
+                {t.name}
               </button>
             );
           })}
-
-          {/* Result count */}
-          {!isLoading && !error && (
-            <span className="ml-auto text-xs" style={{ color: "#94A3B8", alignSelf: "center" }}>
-              {total === 0
-                ? "No results"
-                : <><strong style={{ color: "#0F172A" }}>{total.toLocaleString()}</strong> problems</>}
-            </span>
-          )}
-          {isLoading && (
-            <span className="ml-auto text-xs animate-pulse" style={{ color: "#F59E0B" }}>Searching…</span>
-          )}
-          {error && (
-            <span className="ml-auto text-xs" style={{ color: "#DC2626" }}>{error}</span>
-          )}
         </div>
+
+        {/* ── Filter dropdowns row ── */}
+        <div className="flex flex-wrap items-center gap-2 pb-3" style={{ borderBottom: "1px solid #F1F5F9" }}>
+          <MultiSelectDropdown
+            label="Level"
+            options={LEVELS}
+            selected={selectedLevels}
+            onToggle={toggleLevel}
+            onClear={() => setFilters({ ...filters, level: undefined, page: 1 })}
+          />
+          <MultiSelectDropdown
+            label="Competition"
+            options={COMPETITIONS}
+            selected={selectedCompetitions}
+            onToggle={toggleCompetition}
+            onClear={() => setFilters({ ...filters, competition: undefined, page: 1 })}
+          />
+
+          {/* Year range */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Year</span>
+            <input
+              type="number"
+              placeholder="From"
+              min={1900} max={2100}
+              value={filters.year_min ?? ""}
+              onChange={(e) => setFilters({ ...filters, year_min: e.target.value ? Number(e.target.value) : undefined, page: 1 })}
+              className="w-20 h-8 rounded-lg text-xs px-2 outline-none"
+              style={{ background: "#fff", border: "1.5px solid #E2E8F0", color: "#0F172A" }}
+            />
+            <span style={{ color: "#CBD5E1", fontSize: 12 }}>–</span>
+            <input
+              type="number"
+              placeholder="To"
+              min={1900} max={2100}
+              value={filters.year_max ?? ""}
+              onChange={(e) => setFilters({ ...filters, year_max: e.target.value ? Number(e.target.value) : undefined, page: 1 })}
+              className="w-20 h-8 rounded-lg text-xs px-2 outline-none"
+              style={{ background: "#fff", border: "1.5px solid #E2E8F0", color: "#0F172A" }}
+            />
+          </div>
+
+          {/* Clear all + result count */}
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={() => setFilters({ page: 1, page_size: 20 })}
+              className="text-xs font-semibold px-2 py-1 rounded-md transition-colors hover:bg-red-50"
+              style={{ color: "#DC2626" }}
+            >
+              Clear all ×
+            </button>
+          )}
+          <span className="ml-auto text-xs" style={{ color: "#94A3B8" }}>
+            {isLoading
+              ? <span className="animate-pulse" style={{ color: "#F59E0B" }}>Searching…</span>
+              : error
+                ? <span style={{ color: "#DC2626" }}>{error}</span>
+                : total > 0
+                  ? <><strong style={{ color: "#0F172A" }}>{total.toLocaleString()}</strong> problems</>
+                  : "No results"}
+          </span>
+        </div>
+
+        {/* ── Active filter chips ── */}
+        {hasAnyFilter && (
+          <div className="flex flex-wrap gap-1.5 py-2">
+            {activeTopics.map((code) => {
+              const name = topicNodes.find((t) => t.code === code)?.name ?? code;
+              return (
+                <span key={code} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                  style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
+                  {name}
+                  <button type="button" onClick={() => toggleTopic(code)} style={{ lineHeight: 1, color: "#D97706" }}>×</button>
+                </span>
+              );
+            })}
+            {selectedLevels.map((l) => (
+              <span key={l} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                style={{ background: "#DBEAFE", color: "#1D4ED8", border: "1px solid #BFDBFE" }}>
+                {l.charAt(0).toUpperCase() + l.slice(1)}
+                <button type="button" onClick={() => toggleLevel(l)} style={{ lineHeight: 1, color: "#1D4ED8" }}>×</button>
+              </span>
+            ))}
+            {selectedCompetitions.map((c) => (
+              <span key={c} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                style={{ background: "#EDE9FE", color: "#5B21B6", border: "1px solid #DDD6FE" }}>
+                {c}
+                <button type="button" onClick={() => toggleCompetition(c)} style={{ lineHeight: 1, color: "#5B21B6" }}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Results ── */}
@@ -185,15 +262,13 @@ export function SearchPage() {
             ))}
           </ul>
         )}
-
         {!isLoading && results.length === 0 && !error && (
           <div className="text-center py-20" style={{ color: "#94A3B8" }}>
             <p className="text-4xl mb-3">∅</p>
-            <p className="font-medium text-slate-600">No problems match your search.</p>
-            <p className="text-sm mt-1">Try different keywords or select another domain.</p>
+            <p className="font-medium" style={{ color: "#475569" }}>No problems match your search.</p>
+            <p className="text-sm mt-1">Try different keywords or adjust the filters.</p>
           </div>
         )}
-
         <Pagination
           page={page}
           total={total}
