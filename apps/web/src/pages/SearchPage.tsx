@@ -128,7 +128,7 @@ export function SearchPage() {
 
       {/* ── Domain multiselect pills ── */}
       <div className="px-6 pt-4 pb-0" style={{ background: "#F8F9FC" }}>
-        <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        <div className="flex gap-1.5 mb-3 flex-wrap">
           <button
             type="button"
             onClick={() => setFilters({ ...filters, topics: undefined, page: 1 })}
@@ -158,7 +158,7 @@ export function SearchPage() {
         </div>
 
         {/* ── Filter dropdowns row ── */}
-        <div className="flex flex-wrap items-center gap-2 pb-3 overflow-x-auto" style={{ borderBottom: "1px solid #F1F5F9", scrollbarWidth: "none" }}>
+        <div className="flex flex-wrap items-center gap-2 pb-3" style={{ borderBottom: "1px solid #F1F5F9" }}>
           <MultiSelectDropdown
             label="Level"
             options={LEVELS}
