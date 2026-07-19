@@ -41,22 +41,81 @@ function exportPdf({ title, showAnswers, problems }: ExportOptions): void {
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Georgia", serif; font-size: 12pt; color: #000; padding: 2cm; }
-    h1  { font-size: 18pt; margin-bottom: 0.2rem; }
-    .date { font-size: 10pt; color: #555; margin-bottom: 1.5rem; border-bottom: 1px solid #ccc; padding-bottom: 0.6rem; }
-    .problem { margin-bottom: 2.2rem; page-break-inside: avoid; }
-    .problem-num { font-weight: 700; font-size: 13pt; display: block; margin-bottom: 0.3rem; }
-    .problem-title { font-weight: 600; font-size: 11pt; margin-bottom: 0.3rem; }
-    .problem-statement { line-height: 1.75; }
-    .problem-meta { font-size: 9pt; color: #666; margin-top: 0.3rem; }
-    .problem-answer { margin-top: 0.7rem; padding: 0.4rem 0.75rem; background: #f5f5f5; border-left: 3px solid #333; font-size: 10pt; }
-    @media print { body { padding: 0; } }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @page { margin: 2.8cm 3cm; }
+
+    body {
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 11.5pt;
+      color: #111;
+      line-height: 1;
+      background: #fff;
+    }
+
+    /* ── Cover ── */
+    .cover {
+      text-align: center;
+      margin-bottom: 2.8rem;
+      padding-bottom: 1.2rem;
+      border-bottom: 2px solid #111;
+    }
+    .cover h1 {
+      font-size: 22pt;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.4rem;
+    }
+    .cover .date {
+      font-size: 10pt;
+      color: #555;
+      font-style: italic;
+    }
+
+    /* ── Problems ── */
+    .problem {
+      margin-bottom: 2.6rem;
+      page-break-inside: avoid;
+    }
+    .problem + .problem {
+      padding-top: 2rem;
+      border-top: 1px solid #ddd;
+    }
+    .problem-num {
+      display: block;
+      font-weight: 700;
+      font-size: 12.5pt;
+      margin-bottom: 0.65rem;
+    }
+    .problem-statement {
+      line-height: 1.85;
+      font-size: 11.5pt;
+    }
+    /* KaTeX display blocks — add breathing room */
+    .problem-statement .katex-display {
+      margin: 0.8rem 0;
+    }
+
+    /* ── Answer block ── */
+    .problem-answer {
+      margin-top: 1rem;
+      padding: 0.5rem 0.9rem;
+      background: #f6f6f6;
+      border-left: 3px solid #555;
+      font-size: 10.5pt;
+      line-height: 1.6;
+    }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
-  <h1>${escapeHtml(title)}</h1>
-  <p class="date">${escapeHtml(date)}</p>
+  <div class="cover">
+    <h1>${escapeHtml(title)}</h1>
+    <span class="date">${escapeHtml(date)}</span>
+  </div>
   ${problemsHtml}
   <script>window.onload = () => window.print();<\/script>
 </body>
