@@ -32,6 +32,10 @@ export function ChatMessage({ role, content, citations = [], isStreaming = false
       <div className={styles.bubble}>
         {role === "user" ? (
           <p className={styles.userText}>{content}</p>
+        ) : content.length === 0 && isStreaming ? (
+          <div className={styles.thinking} aria-label="Thinking">
+            <span /><span /><span />
+          </div>
         ) : (
           <div
             className={styles.assistantText}

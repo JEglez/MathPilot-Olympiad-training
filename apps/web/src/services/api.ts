@@ -196,7 +196,7 @@ export function searchProblems(params: SearchFilters): Promise<SearchResponse> {
 
 export function browseProblems(params: SearchFilters): Promise<BrowseResponse> {
   const qs = buildQuery(params as Record<string, unknown>);
-  return jsonFetch<BrowseResponse>(`${BASE_URL}/browse${qs}`);
+  return jsonFetch<BrowseResponse>(`${BASE_URL}/problems${qs}`);
 }
 
 export function getProblem(id: string): Promise<ProblemDetailResponse> {
