@@ -18,7 +18,7 @@ export interface AzureOpenAIChatConfig {
 }
 
 // Chat completion parameters fixed per Phase 4 spec
-const TEMPERATURE = 0.3;
+// Note: gpt-5-mini does not support custom temperature (only default=1 is allowed)
 const MAX_TOKENS = 1500;
 const API_VERSION = "2024-02-01";
 
@@ -66,8 +66,7 @@ export class AzureOpenAIChatClient implements ChatModel {
         },
         body: JSON.stringify({
           messages,
-          temperature: TEMPERATURE,
-          max_tokens: MAX_TOKENS,
+          max_completion_tokens: MAX_TOKENS,
           stream: true,
         }),
       });
