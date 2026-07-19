@@ -13,7 +13,7 @@ type LucideIcon = ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttrib
 
 const NAV_ITEMS: Array<{ to: string; end?: boolean; icon: LucideIcon; label: string }> = [
   { to: "/", end: true, icon: Search, label: "Search" },
-  { to: "/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/chat", icon: MessageSquare, label: "AI Finder" },
 ];
 
 const DOMAINS = [
