@@ -1,11 +1,28 @@
 import { useCallback, useState } from "react";
-import type { ChatMessage, CitedProblem, SearchFilters } from "../services/api";
-import { streamChat } from "../services/api";
+import type { ChatMode, ChatQueryResponse, ProblemCard, SearchFilters } from "../services/api";
+import { queryProblems } from "../services/api";
+
+// ── Turn types (discriminated union) ─────────────────────────────────────────
+
+export interface UserTurn {
+  readonly role: "user";
+  readonly content: string;
+}
+
+export interface AssistantTurn {
+  readonly role: "assistant";
+  readonly mode: ChatMode;
+  readonly summary: string;
+  readonly problems: ProblemCard[];
+}
+
+export type ChatTurn = UserTurn | AssistantTurn;
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 interface UseChatResult {
-  readonly messages: ChatMessage[];
-  readonly citations: CitedProblem[];
-  readonly isStreaming: boolean;
+  readonly turns: ChatTurn[];
+  readonly isLoading: boolean;
   readonly error: string | null;
   readonly send: (text: string) => void;
 }
@@ -13,64 +30,39 @@ interface UseChatResult {
 export function useChat(
   filters?: Omit<SearchFilters, "q" | "page" | "page_size">,
 ): UseChatResult {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [citations, setCitations] = useState<CitedProblem[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const send = useCallback(
     (text: string) => {
-      if (isStreaming) return;
+      if (isLoading) return;
 
-      const userMessage: ChatMessage = { role: "user", content: text };
-      const history = messages;
-
-      setMessages((prev) => [
-        ...prev,
-        userMessage,
-        { role: "assistant", content: "" },
-      ]);
-      setIsStreaming(true);
+      setTurns((prev) => [...prev, { role: "user", content: text }]);
+      setIsLoading(true);
       setError(null);
 
-      streamChat(
-        { message: text, history, filters },
-        (delta) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.role === "assistant") {
-              updated[updated.length - 1] = {
-                role: "assistant",
-                content: last.content + delta,
-              };
-            }
-            return updated;
-          });
-        },
-        (newCitations) => {
-          setCitations((prev) => {
-            const ids = new Set(prev.map((c) => c.id));
-            const added = newCitations.filter((c) => !ids.has(c.id));
-            return [...prev, ...added];
-          });
-        },
-      )
+      queryProblems({ message: text, filters })
+        .then((result: ChatQueryResponse) => {
+          setTurns((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              mode: result.mode,
+              summary: result.summary,
+              problems: result.problems,
+            },
+          ]);
+        })
         .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "Chat failed");
-          // Remove the empty assistant placeholder on error
-          setMessages((prev) =>
-            prev[prev.length - 1]?.content === ""
-              ? prev.slice(0, -1)
-              : prev,
-          );
+          setError(e instanceof Error ? e.message : "Query failed");
         })
         .finally(() => {
-          setIsStreaming(false);
+          setIsLoading(false);
         });
     },
-    [isStreaming, messages, filters],
+    [isLoading, filters],
   );
 
-  return { messages, citations, isStreaming, error, send };
+  return { turns, isLoading, error, send };
 }

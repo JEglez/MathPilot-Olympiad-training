@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { SearchFilters } from "../services/api";
 import { useChat } from "../hooks/useChat";
-import type { Citation } from "./ChatMessage";
 import { ChatMessage } from "./ChatMessage";
+import { ChatResultBlock } from "./ChatResultBlock";
 import styles from "./ChatPanel.module.css";
 
 interface Props {
@@ -10,18 +10,18 @@ interface Props {
 }
 
 export function ChatPanel({ filters }: Props) {
-  const { messages, citations, isStreaming, error, send } = useChat(filters);
+  const { turns, isLoading, error, send } = useChat(filters);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [turns, isLoading]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = inputRef.current?.value.trim() ?? "";
-    if (!text || isStreaming) return;
+    if (!text || isLoading) return;
     send(text);
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -33,31 +33,39 @@ export function ChatPanel({ filters }: Props) {
     }
   }
 
-  const citationList: Citation[] = citations.map((c) => ({
-    id: c.id,
-    title: c.title,
-  }));
-
   return (
     <div className={styles.panel}>
       <div className={styles.messages}>
-        {messages.length === 0 && (
+        {turns.length === 0 && (
           <div className={styles.empty}>
-            <p>Ask me to find olympiad problems!</p>
-            <p className={styles.hint}>
-              Try: <em>"Find 3 number theory problems about pigeonhole"</em>
-            </p>
+            <p>Describe what you need in natural language.</p>
+            <div className={styles.examples}>
+              <span>📝 "Give me an exam simulation, state level, 3 problems"</span>
+              <span>🏋️ "5 hard number theory problems for a beginner"</span>
+              <span>🔍 "Geometry problems involving circles from IMO"</span>
+            </div>
           </div>
         )}
-        {messages.map((msg, i) => (
-          <ChatMessage
-            key={i}
-            role={msg.role}
-            content={msg.content}
-            citations={citationList}
-            isStreaming={isStreaming && i === messages.length - 1 && msg.role === "assistant"}
-          />
-        ))}
+
+        {turns.map((turn, i) =>
+          turn.role === "user" ? (
+            <ChatMessage key={i} content={turn.content} />
+          ) : (
+            <ChatResultBlock
+              key={i}
+              mode={turn.mode}
+              summary={turn.summary}
+              problems={turn.problems}
+            />
+          ),
+        )}
+
+        {isLoading && (
+          <div className={styles.loading} aria-label="Finding problems">
+            <span /><span /><span />
+          </div>
+        )}
+
         {error && <p className={styles.error}>{error}</p>}
         <div ref={bottomRef} />
       </div>
@@ -66,19 +74,19 @@ export function ChatPanel({ filters }: Props) {
         <textarea
           ref={inputRef}
           className={styles.textarea}
-          placeholder="Ask about olympiad problems… (Enter to send, Shift+Enter for newline)"
+          placeholder="Describe what you need… (Enter to send, Shift+Enter for newline)"
           rows={2}
           onKeyDown={handleKeyDown}
-          disabled={isStreaming}
-          aria-label="Chat input"
+          disabled={isLoading}
+          aria-label="Query input"
         />
         <button
           className={styles.sendBtn}
           type="submit"
-          disabled={isStreaming}
-          aria-label="Send message"
+          disabled={isLoading}
+          aria-label="Send query"
         >
-          {isStreaming ? "…" : "Send ↑"}
+          {isLoading ? "…" : "Find ↑"}
         </button>
       </form>
     </div>

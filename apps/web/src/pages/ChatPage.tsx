@@ -11,7 +11,7 @@ export function ChatPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Chat with your Problem Corpus</h1>
+        <h1 className={styles.title}>Find Olympiad Problems</h1>
         <button
           className={`${styles.filterToggle} ${showFilters ? styles.filterToggleActive : ""}`}
           onClick={() => setShowFilters((prev) => !prev)}
