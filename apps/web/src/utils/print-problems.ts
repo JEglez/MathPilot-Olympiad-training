@@ -69,10 +69,6 @@ function exportPdf({ title, showAnswers, problems }: ExportOptions): void {
 }
 
 function buildProblemHtml(p: ProblemCard, num: number, showAnswers: boolean): string {
-  const meta = [p.competition, p.source_year, p.competition_level]
-    .filter(Boolean)
-    .join(" · ");
-  const titleHtml = renderLatexToHtml(p.title);
   const statementHtml = renderLatexToHtml(p.statement);
   const answerBlock =
     showAnswers && p.answer
@@ -81,10 +77,8 @@ function buildProblemHtml(p: ProblemCard, num: number, showAnswers: boolean): st
   return `
 <div class="problem">
   <span class="problem-num">Problem ${num}.</span>
-  <div class="problem-title">${titleHtml}</div>
   <div class="problem-statement">${statementHtml}</div>
   ${answerBlock}
-  ${meta ? `<div class="problem-meta">${escapeHtml(meta)}</div>` : ""}
 </div>`;
 }
 
@@ -104,19 +98,10 @@ function exportMarkdown({ title, showAnswers, problems }: ExportOptions): void {
   problems.forEach((p, i) => {
     lines.push(`## Problem ${i + 1}`);
     lines.push(``);
-    lines.push(`**${p.title}**`);
-    lines.push(``);
     lines.push(p.statement);
     lines.push(``);
     if (showAnswers && p.answer) {
       lines.push(`> **Answer:** ${p.answer}`);
-      lines.push(``);
-    }
-    const meta = [p.competition, p.source_year, p.competition_level]
-      .filter(Boolean)
-      .join(" · ");
-    if (meta) {
-      lines.push(`*${meta}*`);
       lines.push(``);
     }
     lines.push(`---`);
@@ -134,22 +119,16 @@ function exportLatex({ title, showAnswers, problems }: ExportOptions): void {
   });
 
   const problemBlocks = problems.map((p, i) => {
-    const meta = [p.competition, p.source_year, p.competition_level]
-      .filter(Boolean)
-      .join(", ");
     const answerLine =
       showAnswers && p.answer
         ? `\n\\medskip\n\\textbf{Answer:} ${latexEscape(p.answer)}\n`
         : "";
-    const metaLine = meta ? `\n{\\small\\textit{${latexEscape(meta)}}}\n` : "";
 
     return [
       `\\begin{problem}{${i + 1}}`,
-      `\\textbf{${latexEscape(p.title)}}`,
       ``,
       p.statement,
       answerLine,
-      metaLine,
       `\\end{problem}`,
     ].join("\n");
   });
