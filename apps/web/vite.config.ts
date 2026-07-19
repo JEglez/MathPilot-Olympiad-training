@@ -7,9 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://omm-mathpilot-api.azurewebsites.net",
+        target: "http://localhost:7071",
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },
