@@ -57,7 +57,7 @@ export function ProblemDetailPage() {
   return (
     <div className="min-h-screen" style={{ background: "#F8F9FC" }}>
       {/* ── Sticky topbar ── */}
-      <div className="sticky top-0 z-10 px-6 py-3 flex items-center gap-3"
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-3 flex items-center gap-3"
         style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}>
         <Link to="/" className="text-xs font-medium hover:underline" style={{ color: "#94A3B8" }}>← Search</Link>
         <span style={{ color: "#E2E8F0" }}>·</span>
@@ -76,7 +76,7 @@ export function ProblemDetailPage() {
       </div>
 
       {/* ── Main content ── */}
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Title */}
         <h1
           className="font-bold leading-tight mb-4"

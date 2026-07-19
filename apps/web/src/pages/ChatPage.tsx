@@ -26,7 +26,7 @@ export function ChatPage() {
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#F8F9FC" }}>
       {/* ── Topbar ── */}
-      <div className="sticky top-0 z-10 px-6 py-3 flex items-center justify-between"
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-3 flex items-center justify-between"
         style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}>
         <span className="text-sm font-semibold" style={{ color: "#0F172A" }}>Chat with your Corpus</span>
         <button
@@ -45,7 +45,7 @@ export function ChatPage() {
 
       {/* ── Optional context filters ── */}
       {showFilters && (
-        <div className="px-6 py-3 flex flex-wrap gap-3 items-center"
+        <div className="px-4 sm:px-6 py-3 flex flex-wrap gap-3 items-center"
           style={{ background: "#F8F9FC", borderBottom: "1px solid #E5E7EB" }}>
           <span className="text-xs text-slate-500 mr-1">Filter retrieved context:</span>
           <MultiSelectDropdown
