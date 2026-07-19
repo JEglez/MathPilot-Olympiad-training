@@ -1,9 +1,11 @@
-import { Menu, MessageSquare, Search, Sigma, X } from "lucide-react";
+import { Menu, MessageSquare, Search, Sigma, X, BookMarked } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import { useState } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
+import { useProblemSet } from "./context/ProblemSetContext";
 import { ChatPage } from "./pages/ChatPage";
+import { MySetPage } from "./pages/MySetPage";
 import { ProblemDetailPage } from "./pages/ProblemDetailPage";
 import { SearchPage } from "./pages/SearchPage";
 
@@ -33,6 +35,8 @@ interface SidebarProps {
 }
 
 function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { problems } = useProblemSet();
+  const setCount = problems.length;
   return (
     <>
       {/* Mobile overlay backdrop */}
@@ -107,6 +111,34 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
+        {/* Workspace nav */}
+        <nav className="flex flex-col gap-0.5 px-3 pt-5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
+            style={{ color: SIDEBAR_SECTION_LABEL }}>
+            Workspace
+          </p>
+          <NavLink
+            to="/my-set"
+            onClick={onClose}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors"
+            style={({ isActive }) => isActive
+              ? { color: SIDEBAR_ACTIVE_COLOR, background: SIDEBAR_ACTIVE_BG, borderLeft: `2px solid ${SIDEBAR_ACTIVE_COLOR}`, fontWeight: 600 }
+              : { color: SIDEBAR_FG }
+            }
+          >
+            <BookMarked size={15} />
+            My Set
+            {setCount > 0 && (
+              <span
+                className="ml-auto text-xs font-bold rounded-full px-1.5 leading-5"
+                style={{ background: SIDEBAR_ACTIVE_COLOR, color: "#0F172A", minWidth: "1.25rem", textAlign: "center" }}
+              >
+                {setCount}
+              </span>
+            )}
+          </NavLink>
+        </nav>
+
         {/* Domains */}
         <nav className="flex flex-col gap-0.5 px-3 pt-5">
           <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
@@ -178,6 +210,7 @@ export function App() {
               <Route path="/" element={<SearchPage />} />
               <Route path="/problems/:id" element={<ProblemDetailPage />} />
               <Route path="/chat" element={<ChatPage />} />
+              <Route path="/my-set" element={<MySetPage />} />
             </Routes>
           </main>
         </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
+import { useProblemSet } from "../context/ProblemSetContext";
 import type { ProblemCard as ProblemCardType } from "../services/api";
 import { renderLatexToHtml } from "../utils/render-latex";
 import { TaxonomyTag } from "./TaxonomyTag";
@@ -31,6 +32,13 @@ function levelVariant(level: string | null | undefined): LevelVariant {
 
 export function ProblemCard({ problem, index, onSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const { add, remove, has } = useProblemSet();
+  const inSet = has(problem.id);
+
+  function toggleSet() {
+    if (inSet) remove(problem.id);
+    else add(problem);
+  }
 
   const statementHtml = renderLatexToHtml(problem.statement);
   const titleHtml = renderLatexToHtml(problem.title);
@@ -144,6 +152,20 @@ export function ProblemCard({ problem, index, onSelect }: Props) {
             }}
           >
             {expanded ? "Close ↑" : "Details ↓"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleSet}
+            aria-pressed={inSet}
+            aria-label={inSet ? "Remove from My Set" : "Add to My Set"}
+            className={cn(
+              "text-xs font-semibold px-3 rounded-lg transition-colors min-h-[44px]",
+              inSet
+                ? "bg-[#F59E0B] text-[#0F172A] border border-[#F59E0B]"
+                : "bg-transparent border border-[#F59E0B] text-[#F59E0B]"
+            )}
+          >
+            {inSet ? "✓ Set" : "+ Set"}
           </button>
         </div>
       </div>
