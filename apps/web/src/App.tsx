@@ -2,7 +2,6 @@ import { MessageSquare, Search, Sigma } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
-import { cn } from "./lib/utils";
 import { ChatPage } from "./pages/ChatPage";
 import { ProblemDetailPage } from "./pages/ProblemDetailPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -21,30 +20,40 @@ const DOMAINS = [
   { label: "Combinatorics", dot: "#C084FC" },
 ] as const;
 
+const SIDEBAR_BG = "#0F172A";
+const SIDEBAR_FG = "rgba(255,255,255,0.6)";
+const SIDEBAR_ACTIVE_COLOR = "#F59E0B";
+const SIDEBAR_ACTIVE_BG = "rgba(245,158,11,0.15)";
+const SIDEBAR_SECTION_LABEL = "rgba(255,255,255,0.28)";
+
 function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col bg-sidebar text-sidebar-foreground">
+    <aside
+      className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col"
+      style={{ background: SIDEBAR_BG, color: SIDEBAR_FG }}
+    >
       {/* Logo */}
       <Link
         to="/"
-        className="flex items-center gap-2.5 px-5 py-5 hover:no-underline"
-        style={{ textDecoration: "none" }}
+        className="flex items-center gap-2.5 px-5 py-5"
+        style={{ textDecoration: "none", color: "inherit" }}
       >
         <span
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-bold text-base shrink-0"
-          style={{ background: "linear-gradient(135deg,#F59E0B,#D97706)" }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-base shrink-0"
+          style={{ background: "linear-gradient(135deg,#F59E0B,#D97706)", color: "#fff" }}
         >
           <Sigma size={17} />
         </span>
         <div className="flex flex-col leading-tight">
-          <span className="font-bold text-sm text-white">MathPilot</span>
-          <span className="text-[9px] uppercase tracking-widest" style={{ color: "#F59E0B" }}>Olympiad</span>
+          <span className="font-bold text-sm" style={{ color: "#fff" }}>MathPilot</span>
+          <span className="text-[9px] uppercase tracking-widest" style={{ color: SIDEBAR_ACTIVE_COLOR }}>Olympiad</span>
         </div>
       </Link>
 
       {/* Training nav */}
       <nav className="flex flex-col gap-0.5 px-3 pt-1">
-        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1" style={{ color: "rgba(255,255,255,0.28)" }}>
+        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
+          style={{ color: SIDEBAR_SECTION_LABEL }}>
           Training
         </p>
         {NAV_ITEMS.map(({ to, end, icon: Icon, label }) => (
@@ -52,15 +61,11 @@ function Sidebar() {
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors",
-                isActive
-                  ? "text-amber-300 font-semibold border-l-2 border-amber-400 bg-sidebar-active-bg"
-                  : "text-sidebar-foreground hover:bg-white/8 hover:text-white"
-              )
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors"
+            style={({ isActive }) => isActive
+              ? { color: SIDEBAR_ACTIVE_COLOR, background: SIDEBAR_ACTIVE_BG, borderLeft: `2px solid ${SIDEBAR_ACTIVE_COLOR}`, fontWeight: 600 }
+              : { color: SIDEBAR_FG }
             }
-            style={({ isActive }) => isActive ? { borderLeftColor: "#F59E0B" } : {}}
           >
             <Icon size={15} />
             {label}
@@ -70,13 +75,15 @@ function Sidebar() {
 
       {/* Domains */}
       <nav className="flex flex-col gap-0.5 px-3 pt-5">
-        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1" style={{ color: "rgba(255,255,255,0.28)" }}>
+        <p className="text-[9px] font-bold uppercase tracking-[0.13em] px-2 mb-1"
+          style={{ color: SIDEBAR_SECTION_LABEL }}>
           Domains
         </p>
         {DOMAINS.map(({ label, dot }) => (
           <div
             key={label}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-sidebar-foreground hover:bg-white/8 hover:text-white cursor-default transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium cursor-default"
+            style={{ color: SIDEBAR_FG }}
           >
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot }} />
             {label}
@@ -85,7 +92,7 @@ function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="mt-auto px-5 py-4 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <div className="mt-auto px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>6,445+ problems</p>
         <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>IMO · USAMO · AIME</p>
       </div>
