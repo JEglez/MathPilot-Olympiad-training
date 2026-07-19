@@ -46,7 +46,7 @@ export function ProblemCard({ problem, index, onSelect }: Props) {
       style={expanded ? { boxShadow: "0 2px 12px rgba(245,158,11,0.1)" } : {}}
     >
       {/* Main row: 3 columns */}
-      <div className="grid gap-3 p-4" style={{ gridTemplateColumns: "32px 1fr 88px" }}>
+      <div className="grid gap-3 p-4 min-w-0" style={{ gridTemplateColumns: "32px minmax(0,1fr) 80px" }}>
         {/* Ordinal */}
         <div className="text-right pt-0.5">
           <span
@@ -108,13 +108,14 @@ export function ProblemCard({ problem, index, onSelect }: Props) {
 
           {/* Statement preview */}
           <div
-            className="text-xs leading-relaxed mb-2 overflow-x-auto"
+            className="text-xs leading-relaxed mb-2 overflow-hidden"
             style={{
               color: "#64748B",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              wordBreak: "break-word",
             }}
             dangerouslySetInnerHTML={{ __html: statementHtml }}
           />

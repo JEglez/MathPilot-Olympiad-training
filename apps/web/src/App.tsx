@@ -98,8 +98,8 @@ export function App() {
     <BrowserRouter>
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="flex-1 ml-56 min-w-0 flex flex-col">
-          <main className="flex-1">
+        <div className="flex-1 ml-56 min-w-0 flex flex-col overflow-x-hidden">
+          <main className="flex-1 w-full min-w-0">
             <Routes>
               <Route path="/" element={<SearchPage />} />
               <Route path="/problems/:id" element={<ProblemDetailPage />} />
