@@ -7,9 +7,9 @@
 }
 
 .headerInner {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 var(--screen-margin-desktop);
   display: flex;
   align-items: center;
   height: 56px;
@@ -17,13 +17,14 @@
 }
 
 .logo {
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   text-decoration: none;
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  line-height: 1.2;
 }
 
 .logo:hover {
@@ -43,42 +44,48 @@
 .navLink {
   padding: 0.375rem 0.75rem;
   border-radius: var(--radius);
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
+  min-height: var(--min-touch-target);
+  display: flex;
+  align-items: center;
 }
 
 .navLink:hover {
   background: var(--color-bg);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   text-decoration: none;
 }
 
 .active {
-  background: #eff6ff;
+  background: var(--color-nav-active-bg);
   color: var(--color-primary);
   font-weight: 500;
 }
 
 .main {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 1.5rem 1rem;
+  padding: var(--space-6) var(--screen-margin-desktop);
 }
 
 @media (max-width: 640px) {
   .headerInner {
-    padding: 0 0.75rem;
+    padding: 0 var(--screen-margin-mobile);
     gap: 1rem;
   }
 
   .logo {
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
 
   .navLink {
     padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
+    font-size: var(--text-xs);
+  }
+
+  .main {
+    padding: var(--space-4) var(--screen-margin-mobile);
   }
 }
