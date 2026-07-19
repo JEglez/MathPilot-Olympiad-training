@@ -22,7 +22,7 @@ import { Pool } from "pg";
 import { z } from "zod";
 import { OpenAIEmbedder } from "../infrastructure/ai/embedder.js";
 import type { EmbeddingGenerator } from "../domain/shared/embedding-generator.js";
-import { IntentExtractor } from "../infrastructure/ai/intent-extractor.js";
+import { IntentExtractor, type ConversationTurn } from "../infrastructure/ai/intent-extractor.js";
 import { retrieveProblems, ChatFiltersSchema } from "./shared/retrieval.js";
 import { validationError, internalError } from "./shared/filters.js";
 
@@ -71,8 +71,14 @@ function getIntentExtractor(): IntentExtractor {
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
+const ConversationTurnSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+});
+
 const ChatRequestSchema = z.object({
   message: z.string().trim().min(1, "message is required"),
+  history: z.array(ConversationTurnSchema).optional().default([]),
   filters: ChatFiltersSchema.optional().default({}),
 });
 
@@ -98,11 +104,11 @@ export async function chatHandler(
     return problemResponse(validationError(detail));
   }
 
-  const { message, filters } = parsed.data;
+  const { message, history, filters } = parsed.data;
 
-  // 2. Extract intent (degrades to raw query on failure — never throws)
-  const intent = await getIntentExtractor().extract(message);
-  context.log(`chatHandler: intent mode=${intent.mode} count=${intent.count}`);
+  // 2. Extract intent with conversation history for context-aware follow-ups
+  const intent = await getIntentExtractor().extract(message, history as ConversationTurn[]);
+  context.log(`chatHandler: intent mode=${intent.mode} count=${intent.count} showAnswers=${intent.showAnswers}`);
 
   // 3. Merge filters: user-supplied filters take precedence over LLM-extracted ones
   const mergedFilters = {
@@ -133,6 +139,7 @@ export async function chatHandler(
     jsonBody: {
       mode: intent.mode,
       summary: intent.summary,
+      showAnswers: intent.showAnswers,
       problems,
     },
   };

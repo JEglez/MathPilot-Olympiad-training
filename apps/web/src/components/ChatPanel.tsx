@@ -55,6 +55,7 @@ export function ChatPanel({ filters }: Props) {
               key={i}
               mode={turn.mode}
               summary={turn.summary}
+              showAnswers={turn.showAnswers}
               problems={turn.problems}
             />
           ),

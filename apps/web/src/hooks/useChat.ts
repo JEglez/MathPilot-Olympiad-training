@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ChatMode, ChatQueryResponse, ProblemCard, SearchFilters } from "../services/api";
+import type { ChatHistoryTurn, ChatMode, ChatQueryResponse, ProblemCard, SearchFilters } from "../services/api";
 import { queryProblems } from "../services/api";
 
 // ── Turn types (discriminated union) ─────────────────────────────────────────
@@ -13,10 +13,22 @@ export interface AssistantTurn {
   readonly role: "assistant";
   readonly mode: ChatMode;
   readonly summary: string;
+  readonly showAnswers: boolean;
   readonly problems: ProblemCard[];
 }
 
 export type ChatTurn = UserTurn | AssistantTurn;
+
+// ── History builder ───────────────────────────────────────────────────────────
+
+/** Convert ChatTurn[] to the flat history format the API expects. */
+function buildHistory(turns: ChatTurn[]): ChatHistoryTurn[] {
+  return turns.map((t) =>
+    t.role === "user"
+      ? { role: "user" as const, content: t.content }
+      : { role: "assistant" as const, content: t.summary },
+  );
+}
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -38,28 +50,37 @@ export function useChat(
     (text: string) => {
       if (isLoading) return;
 
-      setTurns((prev) => [...prev, { role: "user", content: text }]);
-      setIsLoading(true);
-      setError(null);
+      setTurns((prev) => {
+        const history = buildHistory(prev);
 
-      queryProblems({ message: text, filters })
-        .then((result: ChatQueryResponse) => {
-          setTurns((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              mode: result.mode,
-              summary: result.summary,
-              problems: result.problems,
-            },
-          ]);
-        })
-        .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "Query failed");
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+        const userTurn: UserTurn = { role: "user", content: text };
+        const updated = [...prev, userTurn];
+
+        setIsLoading(true);
+        setError(null);
+
+        queryProblems({ message: text, history, filters })
+          .then((result: ChatQueryResponse) => {
+            setTurns((current) => [
+              ...current,
+              {
+                role: "assistant",
+                mode: result.mode,
+                summary: result.summary,
+                showAnswers: result.showAnswers,
+                problems: result.problems,
+              },
+            ]);
+          })
+          .catch((e: unknown) => {
+            setError(e instanceof Error ? e.message : "Query failed");
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+
+        return updated;
+      });
     },
     [isLoading, filters],
   );

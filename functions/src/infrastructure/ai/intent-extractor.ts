@@ -37,6 +37,7 @@ export const IntentSchema = z.object({
   query: z.string().min(1).max(500),
   level: z.enum(COMPETITION_LEVELS).nullable().optional(),
   competition: z.string().nullable().optional(),
+  showAnswers: z.boolean().default(false),
 });
 
 export type Intent = z.infer<typeof IntentSchema>;
@@ -50,6 +51,7 @@ function fallbackIntent(rawQuery: string): Intent {
     query: rawQuery,
     level: undefined,
     competition: undefined,
+    showAnswers: false,
   };
 }
 
@@ -89,6 +91,11 @@ async function accumulateStream(body: import("node:stream/web").ReadableStream<U
 
 // ── Extractor ─────────────────────────────────────────────────────────────────
 
+export interface ConversationTurn {
+  readonly role: "user" | "assistant";
+  readonly content: string;
+}
+
 export class IntentExtractor {
   private readonly config: IntentExtractorConfig;
 
@@ -98,9 +105,10 @@ export class IntentExtractor {
 
   /**
    * Extract structured intent from a natural-language query.
+   * History provides context for follow-ups like "one more" or "retry".
    * Returns a fallback intent on LLM failure — never throws.
    */
-  async extract(userQuery: string): Promise<Intent> {
+  async extract(userQuery: string, history: ConversationTurn[] = []): Promise<Intent> {
     const url = `${this.config.endpoint}/openai/deployments/${this.config.modelId}/chat/completions?api-version=${API_VERSION}`;
 
     let response: Response;
@@ -114,6 +122,7 @@ export class IntentExtractor {
         body: JSON.stringify({
           messages: [
             { role: "system", content: EXTRACT_INTENT_SYSTEM_PROMPT },
+            ...history.map(t => ({ role: t.role, content: t.content })),
             { role: "user", content: userQuery },
           ],
           max_completion_tokens: MAX_TOKENS,

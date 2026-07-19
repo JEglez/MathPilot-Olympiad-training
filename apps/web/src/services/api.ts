@@ -145,14 +145,21 @@ export interface SearchFilters {
 
 export type ChatMode = "exam" | "training" | "general";
 
+export interface ChatHistoryTurn {
+  readonly role: "user" | "assistant";
+  readonly content: string;
+}
+
 export interface ChatRequestBody {
   readonly message: string;
+  readonly history?: ChatHistoryTurn[];
   readonly filters?: Omit<SearchFilters, "q" | "page" | "page_size">;
 }
 
 export interface ChatQueryResponse {
   readonly mode: ChatMode;
   readonly summary: string;
+  readonly showAnswers: boolean;
   readonly problems: ProblemCard[];
 }
 
