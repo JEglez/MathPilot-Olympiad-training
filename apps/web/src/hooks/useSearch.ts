@@ -33,11 +33,7 @@ export function useSearch(filters: SearchFilters, debounceMs = 300): UseSearchRe
       setIsLoading(true);
       setError(null);
 
-      // Use browse endpoint when no query text — /api/search requires q
-      const request = filters.q?.trim()
-        ? searchProblems(filters)
-        : browseProblems(filters);
-
+      const request = filters.q?.trim() ? searchProblems(filters) : browseProblems(filters);
       request
         .then((res) => {
           if (!ctrl.signal.aborted) {

@@ -14,6 +14,7 @@ export function ProblemCard({ problem, onSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const statementHtml = renderLatexToHtml(problem.statement);
+  const titleHtml = renderLatexToHtml(problem.title);
 
   return (
     <article className={styles.card}>
@@ -37,14 +38,16 @@ export function ProblemCard({ problem, onSelect }: Props) {
         <h2 className={styles.title}>
           {onSelect ? (
             <button
-              className={styles.titleButton}
-              onClick={() => onSelect(problem.id)}
-              type="button"
-            >
-              {problem.title}
-            </button>
+                className={styles.titleButton}
+                onClick={() => onSelect(problem.id)}
+                type="button"
+                dangerouslySetInnerHTML={{ __html: titleHtml }}
+              />
           ) : (
-            <Link to={`/problems/${problem.id}`}>{problem.title}</Link>
+            <Link
+              to={`/problems/${problem.id}`}
+              dangerouslySetInnerHTML={{ __html: titleHtml }}
+            />
           )}
         </h2>
       </header>
