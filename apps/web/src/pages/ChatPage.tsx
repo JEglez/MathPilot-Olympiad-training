@@ -26,9 +26,13 @@ export function ChatPage() {
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#F8F9FC" }}>
       {/* ── Topbar ── */}
-      <div className="sticky top-0 z-10 px-4 sm:px-6 py-3 flex items-center justify-between"
-        style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}>
-        <span className="text-sm font-semibold" style={{ color: "#0F172A" }}>Chat with your Corpus</span>
+      <div
+        className="sticky top-0 z-10 px-4 sm:px-6 py-3 flex items-center justify-between"
+        style={{ background: "#fff", borderBottom: "1px solid #E5E7EB" }}
+      >
+        <span className="text-sm font-semibold" style={{ color: "#0F172A" }}>
+          Find Olympiad Problems
+        </span>
         <button
           type="button"
           onClick={() => setShowFilters((p) => !p)}
@@ -45,9 +49,11 @@ export function ChatPage() {
 
       {/* ── Optional context filters ── */}
       {showFilters && (
-        <div className="px-4 sm:px-6 py-3 flex flex-wrap gap-3 items-center"
-          style={{ background: "#F8F9FC", borderBottom: "1px solid #E5E7EB" }}>
-          <span className="text-xs text-slate-500 mr-1">Filter retrieved context:</span>
+        <div
+          className="px-4 sm:px-6 py-3 flex flex-wrap gap-3 items-center"
+          style={{ background: "#F8F9FC", borderBottom: "1px solid #E5E7EB" }}
+        >
+          <span className="text-xs text-slate-500 mr-1">Filter retrieved problems:</span>
           <MultiSelectDropdown
             label="Level"
             options={LEVELS}
@@ -56,9 +62,12 @@ export function ChatPage() {
             onClear={() => setChatFilters((prev) => ({ ...prev, level: undefined }))}
           />
           {Object.keys(chatFilters).some((k) => chatFilters[k as keyof typeof chatFilters]) && (
-            <button type="button" onClick={() => setChatFilters({})}
+            <button
+              type="button"
+              onClick={() => setChatFilters({})}
               className="text-xs font-semibold px-2 py-1 rounded-md"
-              style={{ color: "#DC2626" }}>
+              style={{ color: "#DC2626" }}
+            >
               Clear ×
             </button>
           )}

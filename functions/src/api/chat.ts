@@ -1,22 +1,16 @@
-// POST /api/chat — RAG chat endpoint (retrieve + generate + stream)
-// Per 04-mvp-implementation-roadmap.md §4 tasks 4.1–4.7
-// Per 03-dataset-import-search.md §9
+// POST /api/chat — problem-finding endpoint (intent extract → retrieve → return cards)
 //
 // Flow:
 //   1. Validate request body (Zod)
-//   2. Retrieve top-10 problems via hybrid search
-//   3. Build olympiad coach system prompt with retrieved context
-//   4. Stream GPT-4o-mini response as Server-Sent Events
-//   5. After stream: extract citations, validate against DB, append as SSE event
+//   2. Extract structured intent via LLM (mode, count, query, level) — fast JSON call
+//   3. Merge LLM-extracted filters with any user-supplied filters (user wins)
+//   4. Retrieve top-N problems via hybrid search
+//   5. Return JSON: { mode, summary, problems: ProblemCard[] }
 //
-// SSE event format:
-//   data: {"delta":"<text chunk>"}\n\n  — content chunks during streaming
-//   data: [DONE]\n\n                    — end of stream signal
-//   data: {"citations":[...]}\n\n       — validated cited problems
-//   data: {"error":"<message>"}\n\n     — if generation fails mid-stream
+// Degraded mode: if intent extraction fails, raw message is used as query (general mode).
+// If retrieval fails, returns RFC 9457 error.
 //
-// Degraded mode: if retrieval fails, returns RFC 9457 error (no stream started).
-// If generation fails mid-stream, emits an error SSE event before closing.
+// No streaming — single JSON response. LLM is used only for NL→struct, not generation.
 
 import {
   app,
@@ -24,23 +18,19 @@ import {
   type HttpResponseInit,
   type InvocationContext,
 } from "@azure/functions";
-import { ReadableStream } from "node:stream/web";
 import { Pool } from "pg";
 import { z } from "zod";
 import { OpenAIEmbedder } from "../infrastructure/ai/embedder.js";
 import type { EmbeddingGenerator } from "../domain/shared/embedding-generator.js";
-import { AzureOpenAIChatClient } from "../infrastructure/ai/chat-client.js";
-import type { ChatModel } from "../domain/shared/chat-model.js";
-import { buildCoachSystemPrompt } from "../infrastructure/ai/prompts/chat-coach.js";
+import { IntentExtractor, type ConversationTurn } from "../infrastructure/ai/intent-extractor.js";
 import { retrieveProblems, ChatFiltersSchema } from "./shared/retrieval.js";
-import { extractCitations, lookupCitations } from "./shared/citations.js";
 import { validationError, internalError } from "./shared/filters.js";
 
 // ── Singletons (reused across warm invocations) ───────────────────────────────
 
 let _pool: Pool | undefined;
 let _embedder: EmbeddingGenerator | undefined;
-let _chatClient: ChatModel | undefined;
+let _intentExtractor: IntentExtractor | undefined;
 
 function getPool(): Pool {
   if (!_pool) {
@@ -66,71 +56,32 @@ function getEmbedder(): EmbeddingGenerator {
   return _embedder;
 }
 
-function getChatClient(): ChatModel {
-  if (!_chatClient) {
+function getIntentExtractor(): IntentExtractor {
+  if (!_intentExtractor) {
     const endpoint = process.env["MATHPILOT_OPENAI_ENDPOINT"];
     const apiKey = process.env["MATHPILOT_OPENAI_KEY"];
-    const modelId =
-      process.env["MATHPILOT_CHAT_MODEL"] ?? "gpt-4o-mini";
+    const modelId = process.env["MATHPILOT_CHAT_MODEL"] ?? "gpt-5-mini";
     if (!endpoint || !apiKey) {
-      throw new Error(
-        "MATHPILOT_OPENAI_ENDPOINT and MATHPILOT_OPENAI_KEY must be set",
-      );
+      throw new Error("MATHPILOT_OPENAI_ENDPOINT and MATHPILOT_OPENAI_KEY must be set");
     }
-    _chatClient = new AzureOpenAIChatClient({ endpoint, apiKey, modelId });
+    _intentExtractor = new IntentExtractor({ endpoint, apiKey, modelId });
   }
-  return _chatClient;
+  return _intentExtractor;
 }
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
 const ConversationTurnSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().min(1),
+  content: z.string(),
 });
 
 const ChatRequestSchema = z.object({
   message: z.string().trim().min(1, "message is required"),
   history: z.array(ConversationTurnSchema).optional().default([]),
   filters: ChatFiltersSchema.optional().default({}),
+  exclude_ids: z.array(z.string()).optional().default([]),
 });
-
-type ChatRequest = z.infer<typeof ChatRequestSchema>;
-
-// ── History truncation ────────────────────────────────────────────────────────
-
-/** 1 token ≈ 4 chars. Keep last N turns where total chars < 32_000 (~8k tokens). */
-const MAX_HISTORY_CHARS = 32_000;
-
-function truncateHistory(
-  history: ChatRequest["history"],
-): ChatRequest["history"] {
-  let totalChars = 0;
-  const result: ChatRequest["history"] = [];
-
-  // Iterate from newest to oldest, prepend to preserve order
-  for (let i = history.length - 1; i >= 0; i--) {
-    const turn = history[i];
-    if (!turn) continue;
-    totalChars += turn.content.length;
-    if (totalChars > MAX_HISTORY_CHARS) break;
-    result.unshift(turn);
-  }
-
-  return result;
-}
-
-// ── SSE helpers ───────────────────────────────────────────────────────────────
-
-const encoder = new TextEncoder();
-
-function sseEvent(data: string): Uint8Array {
-  return encoder.encode(`data: ${data}\n\n`);
-}
-
-function sseJson(payload: unknown): Uint8Array {
-  return sseEvent(JSON.stringify(payload));
-}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
@@ -138,7 +89,7 @@ export async function chatHandler(
   request: HttpRequest,
   context: InvocationContext,
 ): Promise<HttpResponseInit> {
-  // 1. Parse and validate request body
+  // 1. Parse and validate
   let body: unknown;
   try {
     body = await request.json();
@@ -154,72 +105,45 @@ export async function chatHandler(
     return problemResponse(validationError(detail));
   }
 
-  const { message, history, filters } = parsed.data;
+  const { message, history, filters, exclude_ids } = parsed.data;
 
-  // 2. Retrieve problems (non-streaming — must happen before stream starts)
+  // 2. Extract intent with conversation history for context-aware follow-ups
+  const intent = await getIntentExtractor().extract(message, history as ConversationTurn[]);
+  context.log(`chatHandler: intent mode=${intent.mode} count=${intent.count} showAnswers=${intent.showAnswers}`);
+
+  // 3. Merge filters: user-supplied filters take precedence over LLM-extracted ones
+  const mergedFilters = {
+    ...filters,
+    level: filters.level ?? intent.level ?? undefined,
+    competition: filters.competition ?? intent.competition ?? undefined,
+  };
+
+  // 4. Retrieve problems
   let problems: Awaited<ReturnType<typeof retrieveProblems>>;
   try {
     problems = await retrieveProblems(
-      message,
-      filters,
-      10,
+      intent.query,
+      mergedFilters,
+      intent.count,
       getPool(),
       getEmbedder(),
+      exclude_ids,
     );
   } catch (e) {
     context.error("chatHandler: retrieval failed", e);
     return problemResponse(internalError("Problem retrieval failed"));
   }
 
-  // 3. Build system prompt (per ai-guidelines §2.2: context goes in system, not user)
-  const systemPrompt = buildCoachSystemPrompt(problems);
-  const truncatedHistory = truncateHistory(history);
-  const pool = getPool();
-
-  // 4. Create SSE ReadableStream
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let fullResponse = "";
-
-      try {
-        const chatClient = getChatClient();
-
-        // Stream content deltas
-        for await (const delta of chatClient.streamChat(
-          systemPrompt,
-          truncatedHistory,
-          message,
-        )) {
-          fullResponse += delta;
-          controller.enqueue(sseJson({ delta }));
-        }
-
-        // Signal end of streamed text
-        controller.enqueue(sseEvent("[DONE]"));
-
-        // Extract and validate citations
-        const citedIds = extractCitations(fullResponse);
-        const citations = await lookupCitations(citedIds, pool);
-        controller.enqueue(sseJson({ citations }));
-      } catch (e) {
-        context.error("chatHandler: generation failed mid-stream", e);
-        controller.enqueue(sseJson({ error: "Generation failed" }));
-      } finally {
-        controller.close();
-      }
-    },
-  });
-
+  // 5. Return structured JSON result
   return {
     status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-      // Disable Nginx/Azure proxy buffering so chunks reach the client immediately
-      "X-Accel-Buffering": "no",
+    headers: { "Content-Type": "application/json" },
+    jsonBody: {
+      mode: intent.mode,
+      summary: intent.summary,
+      showAnswers: intent.showAnswers,
+      problems,
     },
-    body: stream,
   };
 }
 

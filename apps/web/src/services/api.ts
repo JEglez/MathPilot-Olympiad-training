@@ -143,24 +143,25 @@ export interface SearchFilters {
 
 // ── Chat types ───────────────────────────────────────────────────────────────
 
-export interface ChatMessage {
+export type ChatMode = "exam" | "training" | "general";
+
+export interface ChatHistoryTurn {
   readonly role: "user" | "assistant";
   readonly content: string;
 }
 
 export interface ChatRequestBody {
   readonly message: string;
-  readonly history?: ChatMessage[];
+  readonly history?: ChatHistoryTurn[];
   readonly filters?: Omit<SearchFilters, "q" | "page" | "page_size">;
+  readonly exclude_ids?: string[];
 }
 
-export interface CitedProblem {
-  readonly id: string;
-  readonly title: string;
-  readonly statement: string;
-  readonly competition: string | null;
-  readonly source_year: number | null;
-  readonly topics: TopicRef[];
+export interface ChatQueryResponse {
+  readonly mode: ChatMode;
+  readonly summary: string;
+  readonly showAnswers: boolean;
+  readonly problems: ProblemCard[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -208,14 +209,10 @@ export function getTaxonomy(): Promise<TaxonomyTree> {
 }
 
 /**
- * Streams a chat response via SSE.
- * Calls onChunk for each content delta, onCitations when citation data arrives.
+ * Query problems from a natural-language message.
+ * Returns mode, summary, and a list of matching problem cards.
  */
-export async function streamChat(
-  body: ChatRequestBody,
-  onChunk: (delta: string) => void,
-  onCitations: (citations: CitedProblem[]) => void,
-): Promise<void> {
+export async function queryProblems(body: ChatRequestBody): Promise<ChatQueryResponse> {
   const res = await fetch(`${BASE_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -227,45 +224,5 @@ export async function streamChat(
     throw new Error(`Chat API ${res.status}: ${text}`);
   }
 
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("Response body is not readable");
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    // Keep incomplete last line in buffer
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-
-      // [DONE] is a raw sentinel string — handle before JSON.parse
-      // Citations may still follow on subsequent lines after [DONE]
-      if (data === "[DONE]") continue;
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(data);
-      } catch {
-        continue;
-      }
-
-      if (parsed === null || typeof parsed !== "object") continue;
-
-      // Phase 4 SSE format: {"delta":"..."} for chunks, {"citations":[...]} for citations
-      const event = parsed as Record<string, unknown>;
-      if (typeof event["delta"] === "string") {
-        onChunk(event["delta"]);
-      } else if (Array.isArray(event["citations"])) {
-        onCitations(event["citations"] as CitedProblem[]);
-      }
-    }
-  }
+  return res.json() as Promise<ChatQueryResponse>;
 }

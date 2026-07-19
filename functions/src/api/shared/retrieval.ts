@@ -44,14 +44,12 @@ export type ChatFilters = z.infer<typeof ChatFiltersSchema>;
  * Retrieve the top-K problems most relevant to the query, using hybrid search
  * (tsvector full-text + pgvector cosine similarity + RRF rank fusion).
  *
+ * Fetches a wider candidate pool (topK × 4), excludes already-seen IDs,
+ * then shuffles and trims to topK — so repeated identical queries return
+ * different problems and follow-up prompts never repeat seen problems.
+ *
  * Falls back to text-only search when the embedder returns null (circuit open).
  * Returns at most `topK` problems; may return fewer if insufficient results exist.
- *
- * @param query    Natural-language query (the user's chat message)
- * @param filters  Optional taxonomy/competition filters pre-applied by the UI
- * @param topK     Maximum number of problems to return (recommended: 10 for RAG)
- * @param pool     PostgreSQL connection pool
- * @param embedder Embedding generator for vector search component
  */
 export async function retrieveProblems(
   query: string,
@@ -59,14 +57,16 @@ export async function retrieveProblems(
   topK: number,
   pool: Pool,
   embedder: EmbeddingGenerator,
+  excludeIds: string[] = [],
 ): Promise<ProblemCard[]> {
-  // $1 = vector literal, $2 = tsquery text; filter params start at $3
-  // Use a minimal ParsedSearchParams-compatible object for buildFilterClauses
+  // Fetch a wider candidate pool so we have room to exclude and shuffle
+  const candidateK = Math.max(topK * 4, topK + excludeIds.length + 10);
+
   const filterParams = {
     ...filters,
     q: query,
     page: 1,
-    page_size: topK,
+    page_size: candidateK,
   };
 
   let queryVector: number[] | null = null;
@@ -82,7 +82,7 @@ export async function retrieveProblems(
     queryVector != null ? `[${queryVector.join(",")}]` : null,
     query,
     ...filterClause.values,
-    topK,
+    candidateK,
   ];
 
   const sql = queryVector != null
@@ -90,9 +90,15 @@ export async function retrieveProblems(
     : buildTextOnlyRetrievalSQL(filterClause.sql, limitIdx);
 
   const { rows } = await pool.query<Record<string, unknown>>(sql, queryValues);
-  return rows.map(r =>
+  const candidates = rows.map(r =>
     rowToProblemCard(r as unknown as Parameters<typeof rowToProblemCard>[0]),
   );
+
+  // Exclude already-seen problems, then shuffle, then take topK
+  const excludeSet = new Set(excludeIds);
+  const fresh = candidates.filter(p => !excludeSet.has(p.id));
+  shuffle(fresh);
+  return fresh.slice(0, topK);
 }
 
 // ── SQL builders ──────────────────────────────────────────────────────────────
@@ -144,4 +150,14 @@ ${PROBLEM_CARD_GROUP_BY}
 ORDER BY search_score DESC
 LIMIT $${limitIdx}
   `.trim();
+}
+
+// Fisher-Yates in-place shuffle
+function shuffle<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j] as T;
+    arr[j] = tmp as T;
+  }
 }

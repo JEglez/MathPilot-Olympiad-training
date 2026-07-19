@@ -12,29 +12,58 @@
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 1rem;
 }
 
 .empty {
   text-align: center;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   margin: auto;
 }
 
 .empty p {
   margin: 0.35rem 0;
+  font-size: 1rem;
 }
 
-.hint {
-  font-size: var(--text-sm);
+.examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.loading {
+  display: flex;
+  gap: 5px;
+  padding: 0.5rem 0;
+  align-items: center;
+}
+
+.loading span {
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary, #2563eb);
+  border-radius: 50%;
+  animation: bounce 1s infinite ease-in-out;
+}
+
+.loading span:nth-child(2) { animation-delay: 0.15s; }
+.loading span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
 }
 
 .error {
-  color: var(--color-error);
-  font-size: var(--text-sm);
+  color: #dc2626;
+  font-size: 0.875rem;
   text-align: center;
 }
 
@@ -52,38 +81,33 @@
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  font-size: var(--text-sm);
+  font-size: 0.9rem;
   font-family: inherit;
   outline: none;
   background: var(--color-bg);
-  color: var(--color-text-primary);
 }
 
 .textarea:focus {
-  border-color: var(--color-secondary);
+  border-color: var(--color-primary);
 }
 
-/* Primary button — teal bg per UCOL spec, 44px min height */
 .sendBtn {
-  background: var(--color-btn-primary);
+  background: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: var(--radius);
-  padding: 0 1.25rem;
-  font-size: var(--text-sm);
-  font-family: inherit;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
   font-weight: 500;
   white-space: nowrap;
-  min-height: var(--min-touch-target);
-  display: inline-flex;
-  align-items: center;
+  transition: background 0.15s;
 }
 
 .sendBtn:hover:not(:disabled) {
-  background: var(--color-btn-primary-hover);
+  background: var(--color-primary-hover);
 }
 
 .sendBtn:disabled {
-  opacity: 0.38;
+  opacity: 0.6;
   cursor: not-allowed;
 }
