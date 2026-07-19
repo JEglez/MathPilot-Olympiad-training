@@ -80,6 +80,7 @@ const ChatRequestSchema = z.object({
   message: z.string().trim().min(1, "message is required"),
   history: z.array(ConversationTurnSchema).optional().default([]),
   filters: ChatFiltersSchema.optional().default({}),
+  exclude_ids: z.array(z.string()).optional().default([]),
 });
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ export async function chatHandler(
     return problemResponse(validationError(detail));
   }
 
-  const { message, history, filters } = parsed.data;
+  const { message, history, filters, exclude_ids } = parsed.data;
 
   // 2. Extract intent with conversation history for context-aware follow-ups
   const intent = await getIntentExtractor().extract(message, history as ConversationTurn[]);
@@ -126,6 +127,7 @@ export async function chatHandler(
       intent.count,
       getPool(),
       getEmbedder(),
+      exclude_ids,
     );
   } catch (e) {
     context.error("chatHandler: retrieval failed", e);

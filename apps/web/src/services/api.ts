@@ -154,6 +154,7 @@ export interface ChatRequestBody {
   readonly message: string;
   readonly history?: ChatHistoryTurn[];
   readonly filters?: Omit<SearchFilters, "q" | "page" | "page_size">;
+  readonly exclude_ids?: string[];
 }
 
 export interface ChatQueryResponse {

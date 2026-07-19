@@ -19,7 +19,7 @@ export interface AssistantTurn {
 
 export type ChatTurn = UserTurn | AssistantTurn;
 
-// ── History builder ───────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Convert ChatTurn[] to the flat history format the API expects. */
 function buildHistory(turns: ChatTurn[]): ChatHistoryTurn[] {
@@ -28,6 +28,17 @@ function buildHistory(turns: ChatTurn[]): ChatHistoryTurn[] {
       ? { role: "user" as const, content: t.content }
       : { role: "assistant" as const, content: t.summary },
   );
+}
+
+/** Collect all problem IDs already shown across all assistant turns. */
+function buildExcludeIds(turns: ChatTurn[]): string[] {
+  const ids: string[] = [];
+  for (const turn of turns) {
+    if (turn.role === "assistant") {
+      ids.push(...turn.problems.map((p) => p.id));
+    }
+  }
+  return ids;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -52,6 +63,7 @@ export function useChat(
 
       setTurns((prev) => {
         const history = buildHistory(prev);
+        const exclude_ids = buildExcludeIds(prev);
 
         const userTurn: UserTurn = { role: "user", content: text };
         const updated = [...prev, userTurn];
@@ -59,7 +71,7 @@ export function useChat(
         setIsLoading(true);
         setError(null);
 
-        queryProblems({ message: text, history, filters })
+        queryProblems({ message: text, history, filters, exclude_ids })
           .then((result: ChatQueryResponse) => {
             setTurns((current) => [
               ...current,
