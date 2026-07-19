@@ -6,7 +6,6 @@ import { Pagination } from "../components/Pagination";
 import { ProblemCard } from "../components/ProblemCard";
 import { SearchBar } from "../components/SearchBar";
 import { useSearch } from "../hooks/useSearch";
-import styles from "./SearchPage.module.css";
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,36 +40,38 @@ export function SearchPage() {
   }, [setSearchParams]);
 
   return (
-    <div className={styles.layout}>
-      <aside className={styles.sidebar}>
+    <div className="flex gap-5 items-start">
+      {/* Filter sidebar */}
+      <aside className="w-64 shrink-0 sticky top-6">
         <FilterPanel filters={filters} onChange={setFilters} />
       </aside>
 
-      <section className={styles.content}>
-        <div className={styles.searchRow}>
-          <SearchBar
-            value={filters.q ?? ""}
-            onChange={(q) => setFilters({ ...filters, q: q || undefined, page: 1 })}
-            placeholder="Search olympiad problems…"
-          />
-        </div>
+      {/* Results */}
+      <section className="flex-1 min-w-0 space-y-4">
+        <SearchBar
+          value={filters.q ?? ""}
+          onChange={(q) => setFilters({ ...filters, q: q || undefined, page: 1 })}
+          placeholder="Search olympiad problems…"
+        />
 
-        {error && <p className={styles.error}>{error}</p>}
-
-        <div className={styles.summary}>
+        {/* Summary row */}
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           {isLoading ? (
-            <span className={styles.loading}>Searching…</span>
+            <span className="text-teal animate-pulse">Searching…</span>
+          ) : error ? (
+            <span className="text-destructive">{error}</span>
           ) : (
             <span>
               {total === 0
                 ? "No results found"
-                : `${total.toLocaleString()} problem${total === 1 ? "" : "s"} found`}
+                : <><strong className="text-foreground">{total.toLocaleString()}</strong> problem{total === 1 ? "" : "s"} found</>}
             </span>
           )}
         </div>
 
+        {/* Results list */}
         {!isLoading && results.length > 0 && (
-          <ul className={styles.list}>
+          <ul className="space-y-3 list-none p-0 m-0">
             {results.map((p) => (
               <li key={p.id}>
                 <ProblemCard problem={p} />
@@ -80,9 +81,10 @@ export function SearchPage() {
         )}
 
         {!isLoading && results.length === 0 && !error && (
-          <div className={styles.empty}>
-            <p>No problems match your search.</p>
-            <p>Try different keywords or adjust the filters.</p>
+          <div className="text-center py-16 text-muted-foreground">
+            <p className="text-4xl mb-3">∅</p>
+            <p className="font-medium">No problems match your search.</p>
+            <p className="text-sm">Try different keywords or adjust the filters.</p>
           </div>
         )}
 
@@ -96,3 +98,4 @@ export function SearchPage() {
     </div>
   );
 }
+

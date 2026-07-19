@@ -1,13 +1,28 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "../lib/utils";
 import type { ProblemCard as ProblemCardType } from "../services/api";
 import { renderLatexToHtml } from "../utils/render-latex";
-import styles from "./ProblemCard.module.css";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
 import { TaxonomyTag } from "./TaxonomyTag";
 
 interface Props {
   readonly problem: ProblemCardType;
   readonly onSelect?: (id: string) => void;
+}
+
+type LevelVariant = "local" | "state" | "national" | "international";
+
+function levelVariant(level: string | null | undefined): LevelVariant {
+  const l = (level ?? "").toLowerCase();
+  if (l === "local") return "local";
+  if (l === "state") return "state";
+  if (l === "national") return "national";
+  if (l === "international") return "international";
+  return "local";
 }
 
 export function ProblemCard({ problem, onSelect }: Props) {
@@ -17,50 +32,62 @@ export function ProblemCard({ problem, onSelect }: Props) {
   const titleHtml = renderLatexToHtml(problem.title);
 
   return (
-    <article className={styles.card}>
-      <header className={styles.header}>
-        <div className={styles.meta}>
-          {problem.competition && (
-            <span className={styles.competition}>{problem.competition}</span>
-          )}
-          {problem.source_year !== null && (
-            <span className={styles.year}>{problem.source_year}</span>
-          )}
+    <Card className={cn(
+      "group transition-all duration-150 border-border",
+      "hover:border-teal hover:shadow-sm"
+    )}>
+      <CardHeader className="pb-2">
+        {/* Meta row */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
           {problem.competition_level && (
-            <span className={styles.level}>{problem.competition_level}</span>
+            <Badge variant={levelVariant(problem.competition_level)}>
+              {problem.competition_level}
+            </Badge>
           )}
-          {problem.search_score !== undefined && (
-            <span className={styles.score} title="Relevance score">
-              {(problem.search_score * 100).toFixed(0)}%
+          {problem.competition && (
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase tracking-wide">
+              {problem.competition}
             </span>
           )}
+          {problem.source_year !== null && (
+            <span className="text-xs text-muted-foreground">{problem.source_year}</span>
+          )}
+          {problem.search_score !== undefined && (
+            <Badge variant="score" className="ml-auto">
+              {(problem.search_score * 100).toFixed(0)}% match
+            </Badge>
+          )}
         </div>
-        <h2 className={styles.title}>
+
+        {/* Title */}
+        <h2 className="text-base font-semibold leading-snug m-0">
           {onSelect ? (
             <button
-                className={styles.titleButton}
-                onClick={() => onSelect(problem.id)}
-                type="button"
-                dangerouslySetInnerHTML={{ __html: titleHtml }}
-              />
+              className="text-left text-foreground hover:text-teal transition-colors bg-transparent border-0 p-0 font-semibold text-base leading-snug cursor-pointer"
+              onClick={() => onSelect(problem.id)}
+              type="button"
+              dangerouslySetInnerHTML={{ __html: titleHtml }}
+            />
           ) : (
             <Link
               to={`/problems/${problem.id}`}
+              className="text-foreground hover:text-teal transition-colors no-underline hover:no-underline"
               dangerouslySetInnerHTML={{ __html: titleHtml }}
             />
           )}
         </h2>
-      </header>
+      </CardHeader>
 
-      <div
-        className={styles.statement}
-        // Safe: rendered by KaTeX, no user-controlled HTML paths
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: statementHtml }}
-      />
+      <CardContent className="pt-0">
+        {/* Problem statement */}
+        <div
+          className="text-sm text-foreground/90 leading-relaxed line-clamp-3 overflow-x-auto"
+          dangerouslySetInnerHTML={{ __html: statementHtml }}
+        />
+      </CardContent>
 
-      <footer className={styles.footer}>
-        <div className={styles.tags}>
+      <CardFooter className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-border/60">
+        <div className="flex flex-wrap gap-1.5">
           {problem.topics.map((t) => (
             <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="topic" />
           ))}
@@ -68,57 +95,45 @@ export function ProblemCard({ problem, onSelect }: Props) {
             <TaxonomyTag key={t.code} code={t.code} name={t.name} kind="technique" />
           ))}
         </div>
-        <button
-          className={styles.expandBtn}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 text-muted-foreground hover:text-foreground h-8 px-2"
           onClick={() => setExpanded((prev) => !prev)}
           type="button"
           aria-expanded={expanded}
         >
-          {expanded ? "Hide details ▲" : "Show details ▼"}
-        </button>
-      </footer>
+          {expanded ? <><ChevronUp size={14} /> Hide</> : <><ChevronDown size={14} /> Details</>}
+        </Button>
+      </CardFooter>
 
       {expanded && (
-        <div className={styles.details}>
+        <div className="px-5 pb-5 border-t border-border/60 pt-4 space-y-3">
           {problem.answer !== null && (
-            <div className={styles.answer}>
-              <strong>Answer:</strong>{" "}
-              <span
-                dangerouslySetInnerHTML={{ __html: renderLatexToHtml(problem.answer) }}
-              />
-            </div>
+            <p className="text-sm">
+              <span className="font-semibold">Answer: </span>
+              <span dangerouslySetInnerHTML={{ __html: renderLatexToHtml(problem.answer) }} />
+            </p>
           )}
-          <dl className={styles.dims}>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             {problem.proof_style && (
-              <>
-                <dt>Proof style</dt>
-                <dd>{problem.proof_style}</dd>
-              </>
+              <><dt className="text-muted-foreground font-medium">Proof style</dt><dd className="capitalize">{problem.proof_style}</dd></>
             )}
             {problem.creativity_demand && (
-              <>
-                <dt>Creativity</dt>
-                <dd>{problem.creativity_demand}</dd>
-              </>
+              <><dt className="text-muted-foreground font-medium">Creativity</dt><dd className="capitalize">{problem.creativity_demand}</dd></>
             )}
             {problem.technique_depth && (
-              <>
-                <dt>Technique depth</dt>
-                <dd>{problem.technique_depth}</dd>
-              </>
+              <><dt className="text-muted-foreground font-medium">Technique depth</dt><dd className="capitalize">{problem.technique_depth}</dd></>
             )}
             {problem.entry_barrier && (
-              <>
-                <dt>Entry barrier</dt>
-                <dd>{problem.entry_barrier}</dd>
-              </>
+              <><dt className="text-muted-foreground font-medium">Entry barrier</dt><dd className="capitalize">{problem.entry_barrier}</dd></>
             )}
           </dl>
-          <Link to={`/problems/${problem.id}`} className={styles.detailLink}>
+          <Link to={`/problems/${problem.id}`} className="text-sm font-medium text-secondary hover:underline">
             View full problem →
           </Link>
         </div>
       )}
-    </article>
+    </Card>
   );
 }
